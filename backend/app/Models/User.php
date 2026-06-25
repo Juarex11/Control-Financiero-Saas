@@ -22,6 +22,7 @@ class User extends Authenticatable
         'telefono',
         'photo',
         'currency',
+        'last_login',
     ];
 
     protected $hidden = [
@@ -29,9 +30,10 @@ class User extends Authenticatable
         'remember_token',
     ];
 
-    protected $casts = [
-        'password' => 'hashed',
-    ];
+   protected $casts = [
+    'password'   => 'hashed',
+    'last_login' => 'datetime',
+];
 
     // ── Relaciones ────────────────────────────────────────────────────────────
 

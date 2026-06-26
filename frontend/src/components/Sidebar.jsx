@@ -1,13 +1,15 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Users } from "lucide-react";
+import { LayoutDashboard, Users, Wallet } from "lucide-react";
 
 const MENU_ADMIN = [
   { to: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
   { to: "/usuarios",  label: "Usuarios",  Icon: Users            },
+  { to: "/cuentas",   label: "Cuentas",   Icon: Wallet           },
 ];
 
 const MENU_USER = [
   { to: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
+  { to: "/cuentas",   label: "Cuentas",   Icon: Wallet           },
 ];
 
 export default function Sidebar({ open, onClose, user }) {

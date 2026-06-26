@@ -23,6 +23,7 @@ class User extends Authenticatable
         'photo',
         'currency',
         'last_login',
+        'onboarding_done',
     ];
 
     protected $hidden = [
@@ -30,10 +31,11 @@ class User extends Authenticatable
         'remember_token',
     ];
 
-   protected $casts = [
-    'password'   => 'hashed',
-    'last_login' => 'datetime',
-];
+    protected $casts = [
+        'password'        => 'hashed',
+        'last_login'      => 'datetime',
+        'onboarding_done' => 'boolean',
+    ];
 
     // ── Relaciones ────────────────────────────────────────────────────────────
 
@@ -50,6 +52,18 @@ class User extends Authenticatable
     public function descendientes(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hijos()->with('descendientes');
+    }
+
+    // ← nueva: todas las cuentas ordenadas
+    public function accounts(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Account::class)->orderBy('order')->orderBy('created_at');
+    }
+
+    // ← nueva: solo la cuenta principal
+    public function primaryAccount(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Account::class)->where('is_primary', true);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

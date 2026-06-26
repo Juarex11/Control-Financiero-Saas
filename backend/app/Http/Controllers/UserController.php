@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\Account;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -14,10 +15,10 @@ class UserController extends Controller
     public function register(Request $request)
     {
         $data = $request->validate([
-            'name'          => 'required|string|max:100',
-            'email'         => 'required|email|unique:users,email',
-            'password'      => 'required|string|min:6|confirmed',
-            'codigo_padre'  => 'required|string',
+            'name'         => 'required|string|max:100',
+            'email'        => 'required|email|unique:users,email',
+            'password'     => 'required|string|min:6|confirmed',
+            'codigo_padre' => 'required|string',
         ]);
 
         $padre = User::where('codigo_acceso', strtoupper($data['codigo_padre']))->first();
@@ -36,19 +37,32 @@ class UserController extends Controller
             'currency'      => 'PEN',
         ]);
 
+        // ✅ Crear cuenta principal automáticamente al registrarse
+        Account::create([
+            'user_id'    => $user->id,
+            'name'       => 'Principal',
+            'icon'       => 'wallet',
+            'color'      => '#31138b',
+            'currency'   => $user->currency,
+            'balance'    => 0.00,
+            'is_primary' => true,
+            'order'      => 0,
+        ]);
+
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
             'message' => 'Usuario registrado correctamente.',
             'token'   => $token,
             'user'    => [
-                'id'            => $user->id,
-                'name'          => $user->name,
-                'email'         => $user->email,
-                'role'          => $user->role,
-                'codigo_acceso' => $user->codigo_acceso,
-                'padre_id'      => $user->padre_id,
-                'currency'      => $user->currency,
+                'id'              => $user->id,
+                'name'            => $user->name,
+                'email'           => $user->email,
+                'role'            => $user->role,
+                'codigo_acceso'   => $user->codigo_acceso,
+                'padre_id'        => $user->padre_id,
+                'currency'        => $user->currency,
+                'onboarding_done' => $user->onboarding_done,
             ],
         ], 201);
     }
@@ -70,20 +84,21 @@ class UserController extends Controller
 
     // ── Listar ────────────────────────────────────────────────────────────────
 
-public function index()
-{
-    $users = User::with('padre:id,name,email,codigo_acceso')
-        ->select('id','name','email','role','cargo','telefono','photo','padre_id','codigo_acceso','currency','last_login','created_at')
-        ->get()
-        ->map(function ($user) {
-            $user->photo_url = $user->photo
-                ? asset('storage/' . $user->photo)
-                : null;
-            return $user;
-        });
+    public function index()
+    {
+        $users = User::with('padre:id,name,email,codigo_acceso')
+            ->select('id','name','email','role','cargo','telefono','photo','padre_id','codigo_acceso','currency','last_login','onboarding_done','created_at')
+            ->get()
+            ->map(function ($user) {
+                $user->photo_url = $user->photo
+                    ? asset('storage/' . $user->photo)
+                    : null;
+                return $user;
+            });
 
-    return response()->json($users);
-}
+        return response()->json($users);
+    }
+
     // ── Árbol ─────────────────────────────────────────────────────────────────
 
     public function arbol(Request $request)
@@ -132,6 +147,18 @@ public function index()
             'currency'      => 'PEN',
         ]);
 
+        // ✅ Crear cuenta principal al crear usuario desde admin
+        Account::create([
+            'user_id'    => $user->id,
+            'name'       => 'Principal',
+            'icon'       => 'wallet',
+            'color'      => '#31138b',
+            'currency'   => 'PEN',
+            'balance'    => 0.00,
+            'is_primary' => true,
+            'order'      => 0,
+        ]);
+
         return response()->json([
             'message'   => 'Usuario creado.',
             'user'      => $user,
@@ -163,12 +190,10 @@ public function index()
         if ($request->filled('role'))     $updateData['role']     = $request->role;
         if ($request->filled('password')) $updateData['password'] = Hash::make($request->password);
 
-        // Padre
         if ($request->has('padre_id')) {
             $updateData['padre_id'] = $request->padre_id ?: null;
         }
 
-        // Foto
         if ($request->hasFile('photo')) {
             if ($user->photo && Storage::disk('public')->exists($user->photo)) {
                 Storage::disk('public')->delete($user->photo);
@@ -200,5 +225,13 @@ public function index()
 
         $user->delete();
         return response()->json(['message' => 'Usuario eliminado.']);
+    }
+
+    // ── Completar onboarding ──────────────────────────────────────────────────
+
+    public function completeOnboarding(Request $request)
+    {
+        $request->user()->update(['onboarding_done' => true]);
+        return response()->json(['ok' => true]);
     }
 }

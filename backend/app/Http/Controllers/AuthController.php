@@ -8,46 +8,45 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
-    // ── Login admin (email + password) ────────────────────────────────────────
-    // ── Login usuario (codigo_acceso + password) ──────────────────────────────
+    // ── Login ─────────────────────────────────────────────────────────────────
 
-  public function login(Request $request)
-{
-    $request->validate([
-        'identificador' => 'required|string',
-        'password'      => 'required|string',
-    ]);
+    public function login(Request $request)
+    {
+        $request->validate([
+            'identificador' => 'required|string',
+            'password'      => 'required|string',
+        ]);
 
-    $user = User::where('email', $request->identificador)
-                ->orWhere('codigo_acceso', strtoupper($request->identificador))
-                ->first();
+        $user = User::where('email', $request->identificador)
+                    ->orWhere('codigo_acceso', strtoupper($request->identificador))
+                    ->first();
 
-    if (!$user || !Hash::check($request->password, $user->password)) {
-        return response()->json(['message' => 'Credenciales incorrectas.'], 401);
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            return response()->json(['message' => 'Credenciales incorrectas.'], 401);
+        }
+
+        $user->update(['last_login' => now()]);
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return response()->json([
+            'token' => $token,
+            'user'  => [
+                'id'              => $user->id,
+                'name'            => $user->name,
+                'email'           => $user->email,
+                'role'            => $user->role,
+                'codigo_acceso'   => $user->codigo_acceso,
+                'cargo'           => $user->cargo,
+                'photo'           => $user->photo,
+                'photo_url'       => $user->photo ? asset('storage/' . $user->photo) : null,
+                'currency'        => $user->currency,
+                'padre_id'        => $user->padre_id,
+                'last_login'      => $user->last_login,
+                'onboarding_done' => $user->onboarding_done, // ← nuevo
+            ],
+        ]);
     }
-
-    // Registrar último acceso
-    $user->update(['last_login' => now()]);
-
-    $token = $user->createToken('auth_token')->plainTextToken;
-
-    return response()->json([
-        'token' => $token,
-        'user'  => [
-            'id'            => $user->id,
-            'name'          => $user->name,
-            'email'         => $user->email,
-            'role'          => $user->role,
-            'codigo_acceso' => $user->codigo_acceso,
-            'cargo'         => $user->cargo,
-            'photo'         => $user->photo,
-            'photo_url'     => $user->photo ? asset('storage/' . $user->photo) : null,
-            'currency'      => $user->currency,
-            'padre_id'      => $user->padre_id,
-            'last_login'    => $user->last_login,
-        ],
-    ]);
-}
 
     // ── Logout ────────────────────────────────────────────────────────────────
 
@@ -62,16 +61,20 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         $user = $request->user();
+
         return response()->json([
-            'id'            => $user->id,
-            'name'          => $user->name,
-            'email'         => $user->email,
-            'role'          => $user->role,
-            'codigo_acceso' => $user->codigo_acceso,
-            'cargo'         => $user->cargo,
-            'photo'         => $user->photo,
-            'currency'      => $user->currency,
-            'padre_id'      => $user->padre_id,
+            'id'              => $user->id,
+            'name'            => $user->name,
+            'email'           => $user->email,
+            'role'            => $user->role,
+            'codigo_acceso'   => $user->codigo_acceso,
+            'cargo'           => $user->cargo,
+            'photo'           => $user->photo,
+            'photo_url'       => $user->photo ? asset('storage/' . $user->photo) : null, // ← nuevo
+            'currency'        => $user->currency,
+            'padre_id'        => $user->padre_id,
+            'last_login'      => $user->last_login,
+            'onboarding_done' => $user->onboarding_done, // ← nuevo
         ]);
     }
 }

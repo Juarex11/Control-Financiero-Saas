@@ -2,16 +2,21 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Plus, Trash2, Pencil, Copy, Check,
   Shield, User, Search, X, Camera, ChevronDown, Clock,
-  GitBranch, ArrowLeft, Mail, Hash, Briefcase,
+  GitBranch, ArrowLeft,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAppContext } from "../../layouts/AppLayout";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL     = import.meta.env.VITE_API_URL;
 const STORAGE_URL = import.meta.env.VITE_STORAGE_URL || "";
-
 
 function getToken() {
   return localStorage.getItem("token");
+}
+
+function getLoggedId() {
+  try { return JSON.parse(localStorage.getItem("user") || "{}").id ?? null; }
+  catch { return null; }
 }
 
 function initials(name = "") {
@@ -21,55 +26,24 @@ function initials(name = "") {
 // ── Avatar ──────────────────────────────────────────────────────────────────
 
 function Avatar({ user, size = 8 }) {
-  const [imgError, setImgError] = useState(false);
-  const [perfilError, setPerfilError] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [err,          setErr]          = useState(false);
+  const [perfilErr,    setPerfilErr]    = useState(false);
   const cls = `w-${size} h-${size} rounded-[2px] flex items-center justify-center text-white text-xs font-bold shrink-0 overflow-hidden`;
-  
-  const photoSrc = user.photo_url || (user.photo ? `${STORAGE_URL}/${user.photo}` : null);
 
-  if (!loaded && photoSrc && !imgError) {
+  const src = user.photo_url || (user.photo ? `${STORAGE_URL}/${user.photo}` : null);
+
+  if (src && !err) {
     return (
       <div className={cls}>
-        <img 
-          src={photoSrc} 
-          alt={user.name} 
-          className="w-full h-full object-cover"
-          loading="lazy"
-          onLoad={() => setLoaded(true)}
-          onError={() => setImgError(true)}
-        />
-        <div className={`absolute inset-0 ${user.role === "admin" ? "bg-[#31138b]" : "bg-[#ff4d94]"} flex items-center justify-center`}>
-          <span>{initials(user.name)}</span>
-        </div>
+        <img src={src} alt={user.name} className="w-full h-full object-cover" loading="lazy" onError={() => setErr(true)} />
       </div>
     );
   }
 
-  if (photoSrc && !imgError) {
+  if (!perfilErr) {
     return (
       <div className={cls}>
-        <img 
-          src={photoSrc} 
-          alt={user.name} 
-          className="w-full h-full object-cover"
-          loading="lazy"
-          onError={() => setImgError(true)}
-        />
-      </div>
-    );
-  }
-
-  if (!perfilError) {
-    return (
-      <div className={cls}>
-        <img 
-          src="/perfil.png" 
-          alt="Perfil por defecto" 
-          className="w-full h-full object-cover"
-          loading="lazy"
-          onError={() => setPerfilError(true)}
-        />
+        <img src="/perfil.png" alt="Perfil" className="w-full h-full object-cover" loading="lazy" onError={() => setPerfilErr(true)} />
       </div>
     );
   }
@@ -91,33 +65,35 @@ const CodigoBadge = ({ codigo }) => {
       setTimeout(() => setCopied(false), 1500);
     });
   }, [codigo]);
-  
+
   return (
-    <button onClick={copy}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[2px] bg-gray-50 border border-gray-200 text-gray-600 font-mono text-xs font-bold hover:bg-gray-100 transition">
+    <button
+      onClick={copy}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[2px] bg-gray-50 border border-gray-200 text-gray-600 font-mono text-xs font-bold hover:bg-gray-100 transition"
+    >
       {codigo}
       {copied ? <Check size={11} className="text-green-500" /> : <Copy size={11} className="opacity-50" />}
     </button>
   );
 };
 
-// ── Select buscable ────────────────────────────────────────────────────────
+// ── Select buscable ─────────────────────────────────────────────────────────
 
 function SearchableSelect({ value, onChange, options, placeholder }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen,     setIsOpen]     = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const wrapperRef = useRef(null);
+  const wrapperRef     = useRef(null);
   const searchInputRef = useRef(null);
 
   useEffect(() => {
-    const handleClickOutside = (e) => {
+    const close = (e) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
         setIsOpen(false);
         setSearchTerm("");
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
   }, []);
 
   useEffect(() => {
@@ -129,10 +105,8 @@ function SearchableSelect({ value, onChange, options, placeholder }) {
 
   const selected = options.find(o => o.value === value);
 
-  const filtered = useMemo(() => 
-    options.filter(o =>
-      o.label.toLowerCase().includes(searchTerm.toLowerCase())
-    ),
+  const filtered = useMemo(() =>
+    options.filter(o => o.label.toLowerCase().includes(searchTerm.toLowerCase())),
     [options, searchTerm]
   );
 
@@ -140,7 +114,7 @@ function SearchableSelect({ value, onChange, options, placeholder }) {
     <div ref={wrapperRef} className="relative">
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => setIsOpen(v => !v)}
         className="w-full border border-gray-200 rounded-[2px] px-4 py-2.5 text-sm text-left outline-none focus:border-[#ff4d94] transition bg-white flex items-center justify-between"
       >
         <span className={selected ? "text-gray-800" : "text-gray-400"}>
@@ -158,7 +132,7 @@ function SearchableSelect({ value, onChange, options, placeholder }) {
                 ref={searchInputRef}
                 type="text"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={e => setSearchTerm(e.target.value)}
                 placeholder="Buscar usuario..."
                 className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-[2px] outline-none focus:border-[#ff4d94]"
               />
@@ -196,43 +170,33 @@ function SearchableSelect({ value, onChange, options, placeholder }) {
   );
 }
 
-// ── Formatear fecha ────────────────────────────────────────────────────────
+// ── Formatear fecha ─────────────────────────────────────────────────────────
 
 function formatLastLogin(date) {
   if (!date) return "—";
-  const now = new Date();
-  const last = new Date(date);
-  const diffMs = now - last;
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
+  const now      = new Date();
+  const last     = new Date(date);
+  const diffMins  = Math.floor((now - last) / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays  = Math.floor(diffHours / 24);
 
-  if (diffMins < 1) return "Ahora";
+  if (diffMins < 1)  return "Ahora";
   if (diffMins < 60) return `Hace ${diffMins} min`;
   if (diffHours < 24) return `Hace ${diffHours} h`;
   if (diffDays === 1) return "Ayer";
-  if (diffDays < 7) return `Hace ${diffDays} días`;
-  
-  return last.toLocaleDateString("es-PE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  if (diffDays < 7)   return `Hace ${diffDays} días`;
+
+  return last.toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-// ── Mini organigrama para un usuario ───────────────────────────────────────
+// ── Mini organigrama ────────────────────────────────────────────────────────
 
 function MiniOrganigrama({ user, users, onClose }) {
-  // Construir árbol hacia abajo
-  const buildDescendants = (userId) => {
-    const hijos = users.filter(u => u.padre_id === userId);
-    return hijos.map(h => ({
-      ...h,
-      hijos: buildDescendants(h.id),
-    }));
-  };
+  const buildDescendants = (userId) =>
+    users
+      .filter(u => u.padre_id === userId)
+      .map(h => ({ ...h, hijos: buildDescendants(h.id) }));
 
-  // Construir ancestros hacia arriba
   const buildAncestors = (userId) => {
     const chain = [];
     let current = users.find(u => u.id === userId);
@@ -245,26 +209,19 @@ function MiniOrganigrama({ user, users, onClose }) {
     return chain;
   };
 
-  const ancestors = buildAncestors(user.id);
-  const descendants = buildDescendants(user.id);
-  const fullTree = [...ancestors, user, ...descendants];
+  const ancestors    = buildAncestors(user.id);
+  const descendants  = buildDescendants(user.id);
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-[2px] shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <button
-              onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-[2px] hover:bg-gray-100 text-gray-400 transition"
-            >
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-[2px] hover:bg-gray-100 text-gray-400 transition">
               <ArrowLeft size={18} />
             </button>
             <div>
-              <h3 className="font-bold text-gray-800 text-lg">
-                Organigrama de {user.name}
-              </h3>
+              <h3 className="font-bold text-gray-800 text-lg">Organigrama de {user.name}</h3>
               <p className="text-xs text-gray-400">
                 {ancestors.length > 0 ? `${ancestors.length} nivel(es) arriba · ` : ""}
                 {descendants.length} descendiente(s)
@@ -273,17 +230,14 @@ function MiniOrganigrama({ user, users, onClose }) {
           </div>
         </div>
 
-        {/* Árbol */}
-        <div className="flex-1 overflow-auto p-6">
-          {fullTree.length === 0 ? (
-            <div className="flex items-center justify-center h-40 text-gray-400">
-              Sin conexiones en el árbol
-            </div>
+        <div className="flex-1 overflow-auto p-6 space-y-4">
+          {ancestors.length === 0 && descendants.length === 0 ? (
+            <div className="flex items-center justify-center h-40 text-gray-400">Sin conexiones en el árbol</div>
           ) : (
-            <div className="space-y-4">
-              {ancestors.map((ancestor, i) => (
+            <>
+              {ancestors.map(ancestor => (
                 <div key={ancestor.id} className="flex items-center gap-4">
-                  <div className="w-px h-8 bg-gray-300 ml-6"></div>
+                  <div className="w-px h-8 bg-gray-300 ml-6" />
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-[2px] border border-gray-200">
                     <Avatar user={ancestor} size={8} />
                     <div>
@@ -295,27 +249,24 @@ function MiniOrganigrama({ user, users, onClose }) {
                 </div>
               ))}
 
-              {/* Usuario principal */}
               <div className="flex items-center gap-4">
-                <div className="w-2 h-2 bg-[#31138b] rounded-full ml-[22px]"></div>
-                <div className={`flex items-center gap-3 p-3 rounded-[2px] border-2 border-[#31138b] bg-purple-50/30`}>
+                <div className="w-2 h-2 bg-[#31138b] rounded-full ml-[22px]" />
+                <div className="flex items-center gap-3 p-3 rounded-[2px] border-2 border-[#31138b] bg-purple-50/30">
                   <Avatar user={user} size={10} />
                   <div>
                     <p className="text-sm font-bold text-gray-800">{user.name}</p>
                     <p className="text-xs text-gray-400">{user.email}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[10px] font-bold bg-[#31138b] text-white px-2 py-0.5 rounded-[2px]">
-                        {user.role}
-                      </span>
+                      <span className="text-[10px] font-bold bg-[#31138b] text-white px-2 py-0.5 rounded-[2px]">{user.role}</span>
                       <span className="text-[10px] font-mono text-gray-500">{user.codigo_acceso}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {descendants.map((desc, i) => (
+              {descendants.map(desc => (
                 <div key={desc.id} className="flex items-center gap-4">
-                  <div className="w-px h-8 bg-gray-300 ml-6"></div>
+                  <div className="w-px h-8 bg-gray-300 ml-6" />
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-[2px] border border-gray-200">
                     <Avatar user={desc} size={8} />
                     <div>
@@ -326,7 +277,7 @@ function MiniOrganigrama({ user, users, onClose }) {
                   </div>
                 </div>
               ))}
-            </div>
+            </>
           )}
         </div>
       </div>
@@ -334,25 +285,22 @@ function MiniOrganigrama({ user, users, onClose }) {
   );
 }
 
-// ── Página principal ──────────────────────────────────────────────────────
+// ── Página principal ─────────────────────────────────────────────────────────
 
 export default function UsuariosPage() {
-     const navigate = useNavigate();
+  const navigate = useNavigate();
+  // ✅ Consume el contexto del layout para poder actualizar el header
+  const { onUserUpdate } = useAppContext();
+
   const [users,   setUsers]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [search,  setSearch]  = useState("");
   const [panel,   setPanel]   = useState(false);
   const [editing, setEditing] = useState(null);
-  const [orgUser, setOrgUser] = useState(null); // Usuario para mini organigrama
+  const [orgUser, setOrgUser] = useState(null);
 
   const [form, setForm] = useState({
-    name:     "",
-    email:    "",
-    password: "",
-    cargo:    "",
-    telefono: "",
-    padre_id: "",
-    role:     "user",
+    name: "", email: "", password: "", cargo: "", telefono: "", padre_id: "", role: "user",
   });
   const [photoFile,    setPhotoFile]    = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
@@ -361,33 +309,30 @@ export default function UsuariosPage() {
 
   const set = useCallback((k, v) => setForm(f => ({ ...f, [k]: v })), []);
 
+  // ── Carga de usuarios ──────────────────────────────────────────────────────
+
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-      const res = await fetch(`${API_URL}/users`, {
-        headers: {
-          Authorization: `Bearer ${getToken()}`,
-          Accept: "application/json",
-        },
+      const timeout    = setTimeout(() => controller.abort(), 10000);
+      const res  = await fetch(`${API_URL}/users`, {
+        headers: { Authorization: `Bearer ${getToken()}`, Accept: "application/json" },
         signal: controller.signal,
       });
-      
-      clearTimeout(timeoutId);
+      clearTimeout(timeout);
       const data = await res.json();
       setUsers(Array.isArray(data) ? data : []);
     } catch (err) {
-      if (err.name !== "AbortError") {
-        console.error("Error al cargar usuarios:", err);
-      }
+      if (err.name !== "AbortError") console.error("Error al cargar usuarios:", err);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
+
+  // ── Eliminar ───────────────────────────────────────────────────────────────
 
   const eliminar = useCallback(async (id) => {
     if (!confirm("¿Eliminar este usuario?")) return;
@@ -402,10 +347,11 @@ export default function UsuariosPage() {
     }
   }, [cargar]);
 
+  // ── Panel ──────────────────────────────────────────────────────────────────
+
   const abrirPanel = useCallback((user = null) => {
     setError("");
     setPhotoFile(null);
-    
     if (user) {
       setForm({
         name:     user.name     ?? "",
@@ -419,15 +365,7 @@ export default function UsuariosPage() {
       setPhotoPreview(user.photo_url || (user.photo ? `${STORAGE_URL}/${user.photo}` : null));
       setEditing(user);
     } else {
-      setForm({
-        name:     "",
-        email:    "",
-        password: "",
-        cargo:    "",
-        telefono: "",
-        padre_id: "",
-        role:     "user",
-      });
+      setForm({ name: "", email: "", password: "", cargo: "", telefono: "", padre_id: "", role: "user" });
       setPhotoPreview(null);
       setEditing(null);
     }
@@ -437,15 +375,7 @@ export default function UsuariosPage() {
   const cerrarPanel = useCallback(() => {
     setPanel(false);
     setEditing(null);
-    setForm({
-      name:     "",
-      email:    "",
-      password: "",
-      cargo:    "",
-      telefono: "",
-      padre_id: "",
-      role:     "user",
-    });
+    setForm({ name: "", email: "", password: "", cargo: "", telefono: "", padre_id: "", role: "user" });
     setPhotoPreview(null);
     setPhotoFile(null);
     setError("");
@@ -457,6 +387,8 @@ export default function UsuariosPage() {
     setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
   }, []);
+
+  // ── Guardar ────────────────────────────────────────────────────────────────
 
   const handleSave = useCallback(async () => {
     if (!form.name || !form.email) { setError("Nombre y email son requeridos."); return; }
@@ -478,25 +410,38 @@ export default function UsuariosPage() {
         ? `${API_URL}/users/${editing.id}/update`
         : `${API_URL}/users`;
 
-      const res = await fetch(url, {
+      const res  = await fetch(url, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${getToken()}`,
-          Accept: "application/json",
-        },
+        headers: { Authorization: `Bearer ${getToken()}`, Accept: "application/json" },
         body: fd,
       });
-      
       const data = await res.json();
       if (!res.ok) { setError(data.message || "Error al guardar."); return; }
 
+      // ✅ Si el usuario editado es el que está logueado, actualizar el header
+      if (editing && editing.id === getLoggedId()) {
+        const meRes = await fetch(`${API_URL}/me`, {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (meRes.ok) {
+          const fresh = await meRes.json();
+          localStorage.setItem("user", JSON.stringify(fresh));
+          onUserUpdate(fresh);
+        }
+      }
+
       await cargar();
       cerrarPanel();
-    } catch { setError("No se pudo conectar."); }
-    finally { setSaving(false); }
-  }, [form, editing, photoFile, cargar, cerrarPanel]);
+    } catch {
+      setError("No se pudo conectar.");
+    } finally {
+      setSaving(false);
+    }
+  }, [form, editing, photoFile, cargar, cerrarPanel, onUserUpdate]);
 
-  const filtered = useMemo(() => 
+  // ── Filtros y opciones ─────────────────────────────────────────────────────
+
+  const filtered = useMemo(() =>
     users.filter(u =>
       u.name.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase()) ||
@@ -505,45 +450,47 @@ export default function UsuariosPage() {
     [users, search]
   );
 
-  const padreOptions = useMemo(() => 
+  const padreOptions = useMemo(() =>
     users
       .filter(u => u.id !== editing?.id)
-      .map(u => ({
-        value: u.id,
-        label: `${u.name} — ${u.codigo_acceso || "Sin código"}`,
-      })),
+      .map(u => ({ value: u.id, label: `${u.name} — ${u.codigo_acceso || "Sin código"}` })),
     [users, editing?.id]
   );
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="relative flex h-full">
       <div className={`flex-1 p-6 space-y-5 transition-all duration-300 overflow-y-auto ${panel ? "mr-[420px]" : ""}`}>
+
         {/* Header */}
-       {/* Header */}
-<div className="flex items-center justify-between">
-  <div>
-    <h1 className="text-2xl font-bold text-gray-900">Usuarios</h1>
-    <p className="text-sm text-gray-400 mt-0.5">Gestión del árbol de usuarios</p>
-  </div>
-  <div className="flex items-center gap-2">
-    <button
-      onClick={() => navigate("/organigrama")}
-      className="flex items-center gap-2 px-4 py-2.5 border border-[#31138b] text-[#31138b] text-sm font-semibold rounded-[2px] hover:bg-purple-50 transition">
-      <GitBranch size={16} /> Organigrama
-    </button>
-    <button onClick={() => abrirPanel(null)}
-      className="flex items-center gap-2 px-4 py-2.5 bg-[#31138b] text-white text-sm font-semibold rounded-[2px] hover:bg-[#4c1d95] transition">
-      <Plus size={16} /> Nuevo usuario
-    </button>
-  </div>
-</div>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Usuarios</h1>
+            <p className="text-sm text-gray-400 mt-0.5">Gestión del árbol de usuarios</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate("/organigrama")}
+              className="flex items-center gap-2 px-4 py-2.5 border border-[#31138b] text-[#31138b] text-sm font-semibold rounded-[2px] hover:bg-purple-50 transition"
+            >
+              <GitBranch size={16} /> Organigrama
+            </button>
+            <button
+              onClick={() => abrirPanel(null)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-[#31138b] text-white text-sm font-semibold rounded-[2px] hover:bg-[#4c1d95] transition"
+            >
+              <Plus size={16} /> Nuevo usuario
+            </button>
+          </div>
+        </div>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: "Total", value: users.length, color: "border-l-[3px] border-l-[#31138b]" },
+            { label: "Total",           value: users.length,                              color: "border-l-[3px] border-l-[#31138b]" },
             { label: "Administradores", value: users.filter(u => u.role === "admin").length, color: "border-l-[3px] border-l-[#ff4d94]" },
-            { label: "Usuarios", value: users.filter(u => u.role === "user").length, color: "border-l-[3px] border-l-[#ffbf2f]" },
+            { label: "Usuarios",        value: users.filter(u => u.role === "user").length,  color: "border-l-[3px] border-l-[#ffbf2f]" },
           ].map(s => (
             <div key={s.label} className={`bg-white rounded-[2px] border border-gray-100 px-5 py-4 shadow-sm ${s.color}`}>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{s.label}</p>
@@ -555,12 +502,12 @@ export default function UsuariosPage() {
         {/* Buscador */}
         <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-[2px] px-4 py-2.5 max-w-sm shadow-sm">
           <Search size={15} className="text-gray-400 shrink-0" />
-          <input 
-            type="text" 
-            value={search} 
+          <input
+            type="text"
+            value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar por nombre, email o código…"
-            className="flex-1 text-sm text-gray-700 outline-none placeholder-gray-300 bg-transparent" 
+            className="flex-1 text-sm text-gray-700 outline-none placeholder-gray-300 bg-transparent"
             autoComplete="off"
           />
           {search && (
@@ -574,7 +521,7 @@ export default function UsuariosPage() {
         <div className="bg-white rounded-[2px] border border-gray-100 shadow-sm overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-20 text-gray-400 text-sm">
-              <div className="w-4 h-4 border-2 border-[#31138b] border-t-transparent rounded-full animate-spin mr-2"></div>
+              <div className="w-4 h-4 border-2 border-[#31138b] border-t-transparent rounded-full animate-spin mr-2" />
               Cargando usuarios…
             </div>
           ) : filtered.length === 0 ? (
@@ -599,6 +546,8 @@ export default function UsuariosPage() {
                     const padre = users.find(p => p.id === u.padre_id);
                     return (
                       <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition">
+
+                        {/* Usuario */}
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
                             <Avatar user={u} size={8} />
@@ -608,38 +557,44 @@ export default function UsuariosPage() {
                             </div>
                           </div>
                         </td>
+
+                        {/* Rol */}
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold
-                            ${u.role === "admin" 
-                              ? "bg-[#31138b]/10 text-[#31138b]" 
-                              : "bg-[#ff4d94]/10 text-[#ff4d94]"}`}>
+                            ${u.role === "admin" ? "bg-[#31138b]/10 text-[#31138b]" : "bg-[#ff4d94]/10 text-[#ff4d94]"}`}>
                             {u.role === "admin" ? <Shield size={10} /> : <User size={10} />}
                             {u.role}
                           </span>
                         </td>
+
+                        {/* Código */}
                         <td className="px-4 py-3">
                           <CodigoBadge codigo={u.codigo_acceso} />
                         </td>
+
+                        {/* ✅ Padre — solo nombre, sin foto */}
                         <td className="px-4 py-3">
-                          {padre ? (
-                            <div className="flex items-center gap-1.5">
-                              <Avatar user={padre} size={5} />
-                              <span className="text-xs text-gray-600">{padre.name}</span>
-                            </div>
-                          ) : <span className="text-xs text-gray-300">Raíz</span>}
+                          {padre
+                            ? <span className="text-xs text-gray-600">{padre.name}</span>
+                            : <span className="text-xs text-gray-300">Raíz</span>}
                         </td>
+
+                        {/* Cargo */}
                         <td className="px-4 py-3">
                           <span className="text-xs text-gray-500">{u.cargo || "—"}</span>
                         </td>
+
+                        {/* Último acceso */}
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1.5 text-xs text-gray-500">
                             <Clock size={11} className="text-gray-400 shrink-0" />
-                            <span>{formatLastLogin(u.last_login)}</span>
+                            {formatLastLogin(u.last_login)}
                           </div>
                         </td>
+
+                        {/* Acciones */}
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
-                            {/* Botón organigrama */}
                             <button
                               onClick={() => setOrgUser(u)}
                               className="w-7 h-7 flex items-center justify-center rounded-[2px] text-gray-400 hover:text-[#31138b] hover:bg-purple-50 transition"
@@ -647,12 +602,16 @@ export default function UsuariosPage() {
                             >
                               <GitBranch size={13} />
                             </button>
-                            <button onClick={() => abrirPanel(u)}
-                              className="w-7 h-7 flex items-center justify-center rounded-[2px] text-gray-400 hover:text-[#31138b] hover:bg-purple-50 transition">
+                            <button
+                              onClick={() => abrirPanel(u)}
+                              className="w-7 h-7 flex items-center justify-center rounded-[2px] text-gray-400 hover:text-[#31138b] hover:bg-purple-50 transition"
+                            >
                               <Pencil size={13} />
                             </button>
-                            <button onClick={() => eliminar(u.id)}
-                              className="w-7 h-7 flex items-center justify-center rounded-[2px] text-gray-400 hover:text-red-500 hover:bg-red-50 transition">
+                            <button
+                              onClick={() => eliminar(u.id)}
+                              className="w-7 h-7 flex items-center justify-center rounded-[2px] text-gray-400 hover:text-red-500 hover:bg-red-50 transition"
+                            >
                               <Trash2 size={13} />
                             </button>
                           </div>
@@ -674,13 +633,16 @@ export default function UsuariosPage() {
             <h3 className="font-bold text-gray-800 text-lg">
               {editing ? "Editar usuario" : "Nuevo usuario"}
             </h3>
-            <button onClick={cerrarPanel}
-              className="w-8 h-8 flex items-center justify-center rounded-[2px] hover:bg-gray-100 text-gray-400 transition">
+            <button
+              onClick={cerrarPanel}
+              className="w-8 h-8 flex items-center justify-center rounded-[2px] hover:bg-gray-100 text-gray-400 transition"
+            >
               <X size={18} />
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+            {/* Foto */}
             <div className="flex flex-col items-center gap-3">
               <div className="relative">
                 <div className="w-24 h-24 rounded-[2px] overflow-hidden bg-gray-100 flex items-center justify-center">
@@ -698,13 +660,14 @@ export default function UsuariosPage() {
               <p className="text-xs text-gray-400">Haz clic en la cámara para subir foto</p>
             </div>
 
+            {/* Campos */}
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nombre completo *</label>
                 <input type="text" value={form.name} onChange={e => set("name", e.target.value)}
                   placeholder="Juan Pérez"
                   className="w-full border border-gray-200 rounded-[2px] px-4 py-2.5 text-sm outline-none focus:border-[#ff4d94] transition"
-                  autoComplete="off" name="panel-nombre" />
+                  autoComplete="off" />
               </div>
 
               <div>
@@ -712,7 +675,7 @@ export default function UsuariosPage() {
                 <input type="email" value={form.email} onChange={e => set("email", e.target.value)}
                   placeholder="juan@correo.com"
                   className="w-full border border-gray-200 rounded-[2px] px-4 py-2.5 text-sm outline-none focus:border-[#ff4d94] transition"
-                  autoComplete="off" name="panel-email" />
+                  autoComplete="off" />
               </div>
 
               <div>
@@ -722,7 +685,7 @@ export default function UsuariosPage() {
                 <input type="password" value={form.password} onChange={e => set("password", e.target.value)}
                   placeholder="Mínimo 6 caracteres"
                   className="w-full border border-gray-200 rounded-[2px] px-4 py-2.5 text-sm outline-none focus:border-[#ff4d94] transition"
-                  autoComplete="new-password" name="panel-password" />
+                  autoComplete="new-password" />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -731,14 +694,14 @@ export default function UsuariosPage() {
                   <input type="text" value={form.cargo} onChange={e => set("cargo", e.target.value)}
                     placeholder="Ej: Analista"
                     className="w-full border border-gray-200 rounded-[2px] px-4 py-2.5 text-sm outline-none focus:border-[#ff4d94] transition"
-                    autoComplete="off" name="panel-cargo" />
+                    autoComplete="off" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Teléfono</label>
                   <input type="text" value={form.telefono} onChange={e => set("telefono", e.target.value)}
                     placeholder="999 999 999"
                     className="w-full border border-gray-200 rounded-[2px] px-4 py-2.5 text-sm outline-none focus:border-[#ff4d94] transition"
-                    autoComplete="off" name="panel-telefono" />
+                    autoComplete="off" />
                 </div>
               </div>
 
@@ -755,7 +718,7 @@ export default function UsuariosPage() {
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Usuario padre</label>
                 <SearchableSelect
                   value={form.padre_id}
-                  onChange={(v) => set("padre_id", v)}
+                  onChange={v => set("padre_id", v)}
                   options={padreOptions}
                   placeholder="Sin padre (raíz)"
                 />
@@ -784,11 +747,7 @@ export default function UsuariosPage() {
 
       {/* Mini Organigrama Modal */}
       {orgUser && (
-        <MiniOrganigrama
-          user={orgUser}
-          users={users}
-          onClose={() => setOrgUser(null)}
-        />
+        <MiniOrganigrama user={orgUser} users={users} onClose={() => setOrgUser(null)} />
       )}
     </div>
   );

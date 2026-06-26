@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Account;
+use App\Services\CategorySeeder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -37,7 +38,6 @@ class UserController extends Controller
             'currency'      => 'PEN',
         ]);
 
-        // ✅ Crear cuenta principal automáticamente al registrarse
         Account::create([
             'user_id'    => $user->id,
             'name'       => 'Principal',
@@ -48,6 +48,9 @@ class UserController extends Controller
             'is_primary' => true,
             'order'      => 0,
         ]);
+
+        // ✅ Categorías default
+        CategorySeeder::crearParaUsuario($user->id);
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -114,7 +117,7 @@ class UserController extends Controller
         return response()->json($users);
     }
 
-    // ── Crear ─────────────────────────────────────────────────────────────────
+    // ── Crear (admin) ─────────────────────────────────────────────────────────
 
     public function store(Request $request)
     {
@@ -147,7 +150,6 @@ class UserController extends Controller
             'currency'      => 'PEN',
         ]);
 
-        // ✅ Crear cuenta principal al crear usuario desde admin
         Account::create([
             'user_id'    => $user->id,
             'name'       => 'Principal',
@@ -158,6 +160,9 @@ class UserController extends Controller
             'is_primary' => true,
             'order'      => 0,
         ]);
+
+        // ✅ Categorías default
+        CategorySeeder::crearParaUsuario($user->id);
 
         return response()->json([
             'message'   => 'Usuario creado.',

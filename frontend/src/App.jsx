@@ -9,7 +9,15 @@ import UsuariosPage       from "./pages/admin/UsuariosPage";
 import OrganigramaPage    from "./pages/admin/OrganigramaPage";
 import CuentasPage        from "./pages/CuentasPage";
 import Onboarding         from "./pages/Onboarding";
-
+import ReportesPage from "./pages/ReportesPage";
+import PagosPage        from "./pages/pagos/PagosPage";
+import RecordatoriosPage from "./pages/recordatorios/RecordatoriosPage";
+import TicketsUserPage  from "./pages/tickets/TicketsUserPage";
+import TicketsAdminPage from "./pages/tickets/TicketsAdminPage";
+import TicketChatPage from "./pages/tickets/TicketChatPage";
+import TestimoniosUserPage from "./pages/testimonios/TestimoniosUserPage";
+import TestimoniosPublicPage from "./pages/testimonios/TestimoniosPublicPage";
+import TestimoniosAdminPage from "./pages/testimonios/TestimoniosAdminPage";
 const API_URL = import.meta.env.VITE_API_URL;
 
 // ── Rutas públicas con navegación ─────────────────────────────────────────────
@@ -130,6 +138,14 @@ function App() {
             <Route path="/usuarios"    element={user.role === "admin" ? <UsuariosPage />    : <Navigate to="/dashboard" />} />
             <Route path="/organigrama" element={user.role === "admin" ? <OrganigramaPage /> : <Navigate to="/dashboard" />} />
             <Route path="/"            element={<Navigate to="/dashboard" />} />
+            <Route path="/reportes" element={<ReportesPage />} />
+<Route path="/pagos"         element={<PagosPage />} />
+<Route path="/recordatorios" element={<RecordatoriosPage />} />
+<Route path="/tickets"       element={<TicketsUserPage />} /><Route path="/tickets/:id/chat" element={<TicketChatPage />} />
+<Route path="/testimonios" element={<TestimoniosPublicPage />} />
+<Route path="/testimonios/mi-testimonio" element={<TestimoniosUserPage />} />
+<Route path="/admin/testimonios" element={user.role === "admin" ? <TestimoniosAdminPage /> : <Navigate to="/dashboard" />} />
+<Route path="/admin/tickets" element={user.role === "admin" ? <TicketsAdminPage /> : <Navigate to="/dashboard" />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" />} />
         </Routes>

@@ -3,7 +3,7 @@ import {
   Plus, Pencil, Trash2, X, Check, ChevronRight,
   Wallet, Building2, CreditCard, PiggyBank, TrendingUp,
   Smartphone, Briefcase, Globe, Home, Star,
-  ArrowLeft, MoreVertical,
+  ArrowLeft, MoreVertical, Layers, Award, DollarSign,
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -69,40 +69,32 @@ function formatBalance(balance, currency) {
   return `${symbol} ${Number(balance).toLocaleString("es-PE", { minimumFractionDigits: 2 })}`;
 }
 
-// ── Card de cuenta ────────────────────────────────────────────────────────────
+// ── Card de cuenta (con borde izquierdo) ─────────────────────────────────────
 
 function AccountCard({ account, onClick, onEdit, onDelete }) {
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-[4px] border border-gray-100 shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow group"
+      className="rounded-[4px] border border-gray-100 shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow group"
+      style={{ background: `linear-gradient(135deg, ${account.color} 0%, ${account.color}dd 100%)` }}
     >
-      {/* Franja de color superior */}
-      <div className="h-1.5 w-full" style={{ background: account.color }} />
-
       <div className="p-5">
         <div className="flex items-start justify-between">
           {/* Ícono + nombre */}
           <div className="flex items-center gap-3">
-            <div
-              className="w-11 h-11 rounded-[4px] flex items-center justify-center text-white shrink-0"
-              style={{ background: account.color }}
-            >
+            <div className="w-11 h-11 rounded-[4px] bg-white/20 flex items-center justify-center text-white shrink-0">
               {getIcon(account.icon, 20)}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <p className="text-sm font-bold text-gray-800">{account.name}</p>
+                <p className="text-sm font-bold text-white">{account.name}</p>
                 {account.is_primary && (
-                  <span
-                    className="text-[10px] font-bold px-1.5 py-0.5 rounded-[3px]"
-                    style={{ background: `${account.color}20`, color: account.color }}
-                  >
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-[3px] bg-white/30 text-white">
                     Principal
                   </span>
                 )}
               </div>
-              <p className="text-xs text-gray-400 mt-0.5">{account.currency}</p>
+              <p className="text-xs text-white/70 mt-0.5">{account.currency}</p>
             </div>
           </div>
 
@@ -110,13 +102,13 @@ function AccountCard({ account, onClick, onEdit, onDelete }) {
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={e => { e.stopPropagation(); onEdit(account); }}
-              className="w-7 h-7 flex items-center justify-center rounded-[2px] text-gray-400 hover:text-[#31138b] hover:bg-purple-50 transition"
+              className="w-7 h-7 flex items-center justify-center rounded-[2px] text-white/60 hover:bg-white/20 hover:text-white transition"
             >
               <Pencil size={13} />
             </button>
             <button
               onClick={e => { e.stopPropagation(); onDelete(account); }}
-              className="w-7 h-7 flex items-center justify-center rounded-[2px] text-gray-400 hover:text-red-500 hover:bg-red-50 transition"
+              className="w-7 h-7 flex items-center justify-center rounded-[2px] text-white/60 hover:bg-red-500/30 hover:text-white transition"
             >
               <Trash2 size={13} />
             </button>
@@ -124,28 +116,23 @@ function AccountCard({ account, onClick, onEdit, onDelete }) {
         </div>
 
         {/* Saldo */}
-        <div className="mt-4 pt-4 border-t border-gray-50">
-          <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-1">Saldo</p>
-          <p className="text-2xl font-extrabold text-gray-900">
+        <div className="mt-4 pt-4 border-t border-white/20">
+          <p className="text-xs text-white/70 font-semibold uppercase tracking-wide mb-1">Saldo</p>
+          <p className="text-2xl font-extrabold text-white">
             {formatBalance(account.balance, account.currency)}
           </p>
         </div>
 
         {/* Nota */}
         {account.note && (
-          <p className="text-xs text-gray-400 mt-2 truncate">{account.note}</p>
+          <p className="text-xs text-white/60 mt-2 truncate">{account.note}</p>
         )}
       </div>
 
       {/* Ver detalle */}
-      <div
-        className="flex items-center justify-between px-5 py-2.5 border-t border-gray-50 bg-gray-50/50"
-        style={{ borderTopColor: `${account.color}20` }}
-      >
-        <span className="text-xs font-semibold" style={{ color: account.color }}>
-          Ver detalle
-        </span>
-        <ChevronRight size={13} style={{ color: account.color }} />
+      <div className="flex items-center justify-between px-5 py-2.5 bg-black/10 border-t border-white/10">
+        <span className="text-xs font-semibold text-white/80">Ver detalle</span>
+        <ChevronRight size={13} className="text-white/60" />
       </div>
     </div>
   );
@@ -463,7 +450,7 @@ export default function CuentasPage() {
   const [loading,     setLoading]     = useState(true);
   const [panel,       setPanel]       = useState(false);
   const [editing,     setEditing]     = useState(null);
-  const [detalle,     setDetalle]     = useState(null); // cuenta seleccionada
+  const [detalle,     setDetalle]     = useState(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -516,6 +503,8 @@ export default function CuentasPage() {
     [accounts]
   );
 
+  const cuentaPrincipal = accounts.find(a => a.is_primary);
+
   return (
     <div className="relative flex h-full">
       <div className={`flex-1 p-6 space-y-5 transition-all duration-300 overflow-y-auto ${panel ? "mr-[420px]" : ""}`}>
@@ -551,20 +540,50 @@ export default function CuentasPage() {
               <div className="flex-1" style={{ background: "#ffbf2f" }} />
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-4">
-              {[
-                { label: "Total cuentas",  value: accounts.length,                                    color: "#31138b" },
-                { label: "Cuenta principal", value: accounts.find(a => a.is_primary)?.name ?? "—",   color: "#ff4d94" },
-                { label: "Saldo total",    value: `S/ ${totalSaldo.toLocaleString("es-PE", { minimumFractionDigits: 2 })}`, color: "#ffbf2f" },
-              ].map(({ label, value, color }) => (
-                <div key={label} className="bg-white rounded-[4px] border border-gray-100 px-5 py-4 shadow-sm"
-                  style={{ borderLeft: `3px solid ${color}` }}>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{label}</p>
-                  <p className="text-xl font-extrabold mt-1 text-gray-800 truncate">{value}</p>
-                </div>
-              ))}
-            </div>
+            {/* Stats — Mismo diseño que en la imagen */}
+           {/* Stats — Mismo diseño que en la imagen */}
+<div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+  {/* Total cuentas */}
+  <div className="rounded-[4px] border border-gray-100 shadow-sm px-5 py-4 text-white" style={{ background: "linear-gradient(135deg, #31138b 0%, #4c1d95 100%)" }}>
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+        <Layers size={20} className="text-white" />
+      </div>
+      <div>
+        <p className="text-xs font-semibold text-white/80 uppercase tracking-wide">Total cuentas</p>
+        <p className="text-2xl font-extrabold">{accounts.length}</p>
+      </div>
+    </div>
+  </div>
+
+  {/* Cuenta principal */}
+  <div className="rounded-[4px] border border-gray-100 shadow-sm px-5 py-4 text-white" style={{ background: "linear-gradient(135deg, #ff4d94 0%, #d63384 100%)" }}>
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+        <Award size={20} className="text-white" />
+      </div>
+      <div>
+        <p className="text-xs font-semibold text-white/80 uppercase tracking-wide">Cuenta principal</p>
+        <p className="text-2xl font-extrabold truncate">{cuentaPrincipal?.name || "..."}</p>
+      </div>
+    </div>
+  </div>
+
+  {/* Saldo total */}
+  <div className="rounded-[4px] border border-gray-100 shadow-sm px-5 py-4 text-white" style={{ background: "linear-gradient(135deg, #ffbf2f 0%, #f59e0b 100%)" }}>
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+        <DollarSign size={20} className="text-white" />
+      </div>
+      <div>
+        <p className="text-xs font-semibold text-white/80 uppercase tracking-wide">Saldo total</p>
+        <p className="text-2xl font-extrabold">
+          S/ {totalSaldo.toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
 
             {/* Cards cuentas */}
             {loading ? (

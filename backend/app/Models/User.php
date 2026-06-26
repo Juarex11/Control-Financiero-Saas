@@ -6,7 +6,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Support\Str;
-
+use App\Models\Ticket;
+use App\Models\ReminderCategory;
 class User extends Authenticatable
 {
     use HasApiTokens, Notifiable;
@@ -77,8 +78,31 @@ class User extends Authenticatable
         return $codigo;
     }
 
+    public function categories()
+{
+    return $this->hasMany(Category::class);
+}
+
+public function transactions()
+{
+    return $this->hasMany(Transaction::class);
+}
+
     public function esAdmin(): bool
     {
         return $this->role === 'admin';
     }
+
+    public function tickets()
+{
+    return $this->hasMany(Ticket::class);
+}
+public function reminderCategories()
+{
+    return $this->hasMany(ReminderCategory::class);
+}
+public function testimonio()
+{
+    return $this->hasOne(Testimonio::class);
+}
 }

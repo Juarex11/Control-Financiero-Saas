@@ -50,4 +50,8 @@ class Account extends Model
             default => $this->currency,
         };
     }
+    public function transactions()
+{
+    return $this->hasMany(Transaction::class);
+}
 }

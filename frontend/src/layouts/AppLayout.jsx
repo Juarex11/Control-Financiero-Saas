@@ -28,11 +28,10 @@ export default function AppLayout({ user, onLogout, onUserUpdate }) {
           onMenuClick={() => setSidebarOpen(s => !s)}
           onLogout={onLogout}
         />
-        <main className="flex-1 overflow-y-auto">
-          {/* ✅ Pasamos onUserUpdate al contexto para que cualquier página hija lo consuma */}
+        <main className="flex-1 overflow-y-auto min-h-0">
           <Outlet context={{ onUserUpdate }} />
         </main>
-        <Footer />
+        <Footer />  {/* ← fuera del main, dentro del flex col */}
       </div>
     </div>
   );

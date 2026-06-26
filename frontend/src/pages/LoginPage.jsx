@@ -21,7 +21,6 @@ export default function LoginPage({ onLogin, onGoRegister }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    onsole.log("submit disparado", form);
     setError("");
     setLoading(true);
     try {

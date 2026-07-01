@@ -18,7 +18,12 @@ const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto"
 const PALETTE = ["#31138b","#ff4d94","#ffbf2f","#10b981","#3b82f6","#f97316","#8b5cf6","#06b6d4","#ef4444","#64748b"];
 
 function getCurrencySymbol(code) {
-  const map = { PEN:"S/", USD:"$", EUR:"€", GBP:"£", BRL:"R$", CLP:"$", COP:"$", MXN:"$", ARS:"$", BOB:"Bs" };
+  const map = {
+    PEN: "S/", USD: "$", EUR: "€", ARS: "$", BOB: "Bs",
+    CLP: "$", COP: "$", CRC: "₡", CUP: "$", GTQ: "Q",
+    HNL: "L", MXN: "$", NIO: "C$", PYG: "₲", DOP: "RD$",
+    UYU: "$U", VES: "Bs.S",
+  };
   return map[code] ?? code;
 }
 function formatMoney(amount, currency = "PEN") {

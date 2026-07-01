@@ -99,8 +99,21 @@ function buildNodesAndEdges(users, parentId = null, level = 0, xOffset = { val: 
   return { nodes, edges };
 }
 
+// ─── Aplana el árbol recursivamente ──────────────────────────────────────────
+function flattenTree(users) {
+  let result = [];
+  users.forEach((user) => {
+    result.push(user);
+    const children = user.hijos || user.descendientes || [];
+    if (children.length) {
+      result = result.concat(flattenTree(children));
+    }
+  });
+  return result;
+}
+
 export default function OrganigramaPage() {
-  const navigate = useNavigate(); // ← Movido dentro del componente
+  const navigate = useNavigate();
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [loading, setLoading] = useState(true);
@@ -117,12 +130,17 @@ export default function OrganigramaPage() {
       .then((r) => (r.ok ? r.json() : Promise.reject("Error al cargar")))
       .then((data) => {
         const usersList = Array.isArray(data) ? data : [];
-        const admins = usersList.filter((u) => u.role === "admin").length;
+        
+        // Aplanar todo el árbol para contar todos los nodos
+        const allUsers = flattenTree(usersList);
+        const admins = allUsers.filter((u) => u.role === "admin").length;
+        
         setStats({
-          total: usersList.length,
+          total: allUsers.length,
           admins,
-          users: usersList.length - admins,
+          users: allUsers.length - admins,
         });
+        
         const { nodes: n, edges: e } = buildNodesAndEdges(usersList);
         setNodes(n);
         setEdges(e);

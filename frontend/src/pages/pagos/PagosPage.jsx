@@ -13,7 +13,12 @@ function getToken() { return localStorage.getItem("token"); }
 const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 
 function getCurrencySymbol(code) {
-  const map = { PEN:"S/", USD:"$", EUR:"€", GBP:"£", BRL:"R$", CLP:"$", COP:"$", MXN:"$", ARS:"$", BOB:"Bs" };
+  const map = {
+    PEN: "S/", USD: "$", EUR: "€", ARS: "$", BOB: "Bs",
+    CLP: "$", COP: "$", CRC: "₡", CUP: "$", GTQ: "Q",
+    HNL: "L", MXN: "$", NIO: "C$", PYG: "₲", DOP: "RD$",
+    UYU: "$U", VES: "Bs.S",
+  };
   return map[code] ?? code;
 }
 function formatMoney(amount, currency = "PEN") {
@@ -45,7 +50,6 @@ function TarjetaPago({ pago, onEdit, onDelete, onToggle, onHistorial, onMark, de
   const urgente = dias !== null && dias <= 3 && dias > 0;
   const paused  = pago.status === "paused";
 
-  // Color de fondo: usar el color de la categoría o uno por defecto
   const colorBase = pago.category?.color 
     || (pago.type === "income" ? "#10b981" : "#ef4444");
 
@@ -96,7 +100,6 @@ function TarjetaPago({ pago, onEdit, onDelete, onToggle, onHistorial, onMark, de
             </p>
           </div>
         </div>
-        {/* Badge días */}
         <span style={{
           fontSize:"0.65rem", fontWeight:700, padding:"0.2rem 0.6rem", flexShrink:0,
           background: badge.bg, color: badge.color,
@@ -151,7 +154,6 @@ function TarjetaPago({ pago, onEdit, onDelete, onToggle, onHistorial, onMark, de
         display:"flex", gap:"0.375rem", paddingTop:"0.5rem",
         borderTop:"1px solid rgba(255,255,255,0.15)",
       }}>
-        {/* Marcar pagado / saltado — solo si está pendiente y activo */}
         {!paused && dias !== null && (vencido || dias === 0) && (
           <>
             <button onClick={() => onMark(pago, "paid")}
@@ -312,9 +314,17 @@ export default function PagosPage() {
     return true;
   });
 
+  // ── Cálculo de totales ──────────────────────────────────────────────────────
   const totalGastos   = pagos.filter(p => p.type === "expense" && p.status === "active").reduce((s, p) => s + Number(p.amount), 0);
   const totalIngresos = pagos.filter(p => p.type === "income"  && p.status === "active").reduce((s, p) => s + Number(p.amount), 0);
   const vencidos      = pagos.filter(p => p.status === "active" && diasRestantes(p.next_reminder_date) !== null && diasRestantes(p.next_reminder_date) <= 0).length;
+
+  // ── Moneda principal (para los KPIs) ──────────────────────────────────────
+  const monedaPrincipal = pagos.length > 0
+    ? pagos[0].currency
+    : (JSON.parse(localStorage.getItem("user") || "{}").currency || "PEN");
+
+  const simboloMoneda = getCurrencySymbol(monedaPrincipal);
 
   const btnFilter = (active) => ({
     padding:"0.4rem 1rem",
@@ -351,18 +361,18 @@ export default function PagosPage() {
         <div style={{ flex:1, background:"#ffbf2f" }} />
       </div>
 
-      {/* KPIs con fondo de color */}
+      {/* KPIs con fondo de color — ahora con moneda dinámica */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"1rem", marginBottom:"1.5rem" }}>
         {[
           {
             label: "Gastos activos/período",
-            value: `- ${getCurrencySymbol("PEN")} ${totalGastos.toLocaleString("es-PE",{minimumFractionDigits:2})}`,
+            value: `- ${simboloMoneda} ${totalGastos.toLocaleString("es-PE",{minimumFractionDigits:2})}`,
             color: "#ef4444",
             icon: TrendingDown,
           },
           {
             label: "Ingresos activos/período",
-            value: `+ ${getCurrencySymbol("PEN")} ${totalIngresos.toLocaleString("es-PE",{minimumFractionDigits:2})}`,
+            value: `+ ${simboloMoneda} ${totalIngresos.toLocaleString("es-PE",{minimumFractionDigits:2})}`,
             color: "#10b981",
             icon: TrendingUp,
           },

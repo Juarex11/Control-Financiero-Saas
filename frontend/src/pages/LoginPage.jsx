@@ -163,7 +163,7 @@ export default function LoginPage({ onLogin, onGoRegister }) {
                   type="text"
                   value={identificador}
                   onChange={(e) => setIdentificador(e.target.value)}
-                  placeholder="admin@control.com o XXXXXXXX"
+                  placeholder="Tu correo electronico "
                   className="w-full h-12 rounded-[2px] border border-gray-200 pl-11 pr-4 text-sm outline-none focus:border-purple-500 transition"
                 />
               </div>

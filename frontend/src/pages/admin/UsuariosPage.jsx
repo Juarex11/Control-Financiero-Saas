@@ -53,6 +53,8 @@ function Avatar({ user, size = 8 }) {
 
 const CodigoBadge = ({ codigo }) => {
   const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
   const copy = useCallback(() => {
     navigator.clipboard.writeText(codigo).then(() => {
       setCopied(true);
@@ -60,15 +62,36 @@ const CodigoBadge = ({ codigo }) => {
     });
   }, [codigo]);
 
+  const copyLink = useCallback(() => {
+    const link = `${window.location.origin}/register?code=${codigo}`;
+    navigator.clipboard.writeText(link).then(() => {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 1500);
+    });
+  }, [codigo]);
+
   return (
-    <button onClick={copy}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[2px] bg-gray-50 border border-gray-200 text-gray-600 font-mono text-xs font-bold hover:bg-gray-100 transition">
-      {codigo}
-      {copied ? <Check size={11} className="text-green-500" /> : <Copy size={11} className="opacity-50" />}
-    </button>
+    <div className="inline-flex items-center gap-1">
+      {/* Código */}
+      <button onClick={copy}
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[2px] bg-gray-50 border border-gray-200 text-gray-600 font-mono text-xs font-bold hover:bg-gray-100 transition">
+        {codigo}
+        {copied ? <Check size={11} className="text-green-500" /> : <Copy size={11} className="opacity-50" />}
+      </button>
+
+      {/* Link de invitación */}
+      <button onClick={copyLink}
+        title="Copiar link de invitación"
+        className={`inline-flex items-center justify-center w-6 h-6 rounded-[2px] border transition
+          ${copiedLink
+            ? "bg-green-50 border-green-200 text-green-500"
+            : "bg-gray-50 border-gray-200 text-gray-400 hover:bg-purple-50 hover:border-purple-200 hover:text-[#31138b]"
+          }`}>
+        {copiedLink ? <Check size={11} /> : <span className="text-[11px] leading-none">🔗</span>}
+      </button>
+    </div>
   );
 };
-
 // ── Select buscable ─────────────────────────────────────────────────────────
 
 function SearchableSelect({ value, onChange, options, placeholder }) {

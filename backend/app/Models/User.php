@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Models;
+use Illuminate\Database\Eloquent\Factories\HasFactory;  // ← añadir
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -10,33 +11,46 @@ use App\Models\Ticket;
 use App\Models\ReminderCategory;
 class User extends Authenticatable
 {
-    use HasApiTokens, Notifiable;
+      use HasApiTokens, HasFactory, Notifiable;  // ← añadir HasFactory
 
-    protected $fillable = [
-        'name',
-        'email',
-        'password',
-        'role',
-        'padre_id',
-        'codigo_acceso',
-        'cargo',
-        'telefono',
-        'photo',
-        'currency',
-        'last_login',
-        'onboarding_done',
-    ];
+  protected $fillable = [
+    'name',
+    'email',
+    'password',
+    'role',
+    'padre_id',
+    'codigo_acceso',
+    'cargo',
+    'telefono',
+    'photo',
+    'currency',
+    'last_login',
+    'onboarding_done',
+    'timezone',
+    'pais',
+    'ob_actividad',   // ← añadir
+    'ob_monto',       // ← añadir
+    'ob_metas',       // ← añadir
+    'ob_deudas',      // ← añadir
+    'ob_num_deudas',  // ← añadir
+    'ob_finalidad',   // ← añadir
+];
+
+
 
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    protected $casts = [
-        'password'        => 'hashed',
-        'last_login'      => 'datetime',
-        'onboarding_done' => 'boolean',
-    ];
+ protected $casts = [
+    'password'        => 'hashed',
+    'last_login'      => 'datetime',
+    'onboarding_done' => 'boolean',
+    'ob_metas'        => 'array',    // ← añadir
+    'ob_deudas'       => 'boolean',  // ← añadir
+    'ob_monto'        => 'decimal:2',// ← añadir
+];
 
     // ── Relaciones ────────────────────────────────────────────────────────────
 

@@ -1,23 +1,42 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import AppLayout          from "./layouts/AppLayout";
-import LoginPage          from "./pages/LoginPage";
-import RegisterPage       from "./pages/RegisterPage";
-import DashboardAdminPage from "./pages/DashboardAdminPage";
-import DashboardUserPage  from "./pages/DashboardUserPage";
-import UsuariosPage       from "./pages/admin/UsuariosPage";
-import OrganigramaPage    from "./pages/admin/OrganigramaPage";
-import CuentasPage        from "./pages/CuentasPage";
-import Onboarding         from "./pages/Onboarding";
+
+// Layouts
+import AppLayout from "./layouts/AppLayout";
+
+// Páginas públicas
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+
+// Páginas de usuario
+import DashboardUserPage from "./pages/DashboardUserPage";
+import CuentasPage from "./pages/CuentasPage";
 import ReportesPage from "./pages/ReportesPage";
-import PagosPage        from "./pages/pagos/PagosPage";
+import PagosPage from "./pages/pagos/PagosPage";
 import RecordatoriosPage from "./pages/recordatorios/RecordatoriosPage";
-import TicketsUserPage  from "./pages/tickets/TicketsUserPage";
-import TicketsAdminPage from "./pages/tickets/TicketsAdminPage";
+import TicketsUserPage from "./pages/tickets/TicketsUserPage";
 import TicketChatPage from "./pages/tickets/TicketChatPage";
 import TestimoniosUserPage from "./pages/testimonios/TestimoniosUserPage";
 import TestimoniosPublicPage from "./pages/testimonios/TestimoniosPublicPage";
+import AnunciosPage from "./pages/AnunciosPage";
+import MiEquipoPage from "./pages/MiEquipoPage";
+import MiPerfilPage from "./pages/MiPerfilPage";
+import AgendaPage from "./pages/AgendaPage";
+
+// Páginas de administrador
+import DashboardAdminPage from "./pages/DashboardAdminPage";
+import UsuariosPage from "./pages/admin/UsuariosPage";
+import OrganigramaPage from "./pages/admin/OrganigramaPage";
+import TicketsAdminPage from "./pages/tickets/TicketsAdminPage";
 import TestimoniosAdminPage from "./pages/testimonios/TestimoniosAdminPage";
+import AdminAnunciosPage from "./pages/admin/AdminAnunciosPage";
+
+// Onboarding
+import Onboarding from "./pages/Onboarding";
+
+// En construcción
+import EnConstruccionPage from "./pages/EnConstruccionPage";
+
 const API_URL = import.meta.env.VITE_API_URL;
 
 // ── Rutas públicas con navegación ─────────────────────────────────────────────
@@ -25,25 +44,38 @@ function PublicRoutes({ onLogin }) {
   const navigate = useNavigate();
   return (
     <Routes>
-      <Route path="/login"    element={<LoginPage    onLogin={onLogin} onGoRegister={() => navigate("/register")} />} />
-      <Route path="/register" element={<RegisterPage onLogin={onLogin} onGoLogin={()    => navigate("/login")}    />} />
-      <Route path="*"         element={<Navigate to="/login" />} />
+      <Route
+        path="/login"
+        element={<LoginPage onLogin={onLogin} onGoRegister={() => navigate("/register")} />}
+      />
+      <Route
+        path="/register"
+        element={<RegisterPage onLogin={onLogin} onGoLogin={() => navigate("/login")} />}
+      />
+      <Route path="*" element={<Navigate to="/login" />} />
     </Routes>
   );
 }
 
+// ── Componente principal ──────────────────────────────────────────────────────
 function App() {
-  const [user,    setUser]    = useState(null);
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Cargar sesión al iniciar
   useEffect(() => {
-    const token    = localStorage.getItem("token");
+    const token = localStorage.getItem("token");
     const userData = localStorage.getItem("user");
-    if (!token || !userData) { setLoading(false); return; }
+    if (!token || !userData) {
+      setLoading(false);
+      return;
+    }
 
-    fetch(`${API_URL}/me`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : null)
-      .then(fresh => {
+    fetch(`${API_URL}/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((fresh) => {
         if (fresh) {
           localStorage.setItem("user", JSON.stringify(fresh));
           setUser(fresh);
@@ -56,6 +88,7 @@ function App() {
       .finally(() => setLoading(false));
   }, []);
 
+  // ── Handlers ─────────────────────────────────────────────────────────────────
   const handleLogin = async (token, userData) => {
     try {
       const res = await fetch(`${API_URL}/me`, {
@@ -64,13 +97,13 @@ function App() {
       if (res.ok) {
         const fresh = await res.json();
         localStorage.setItem("token", token);
-        localStorage.setItem("user",  JSON.stringify(fresh));
+        localStorage.setItem("user", JSON.stringify(fresh));
         setUser(fresh);
         return;
       }
     } catch {}
     localStorage.setItem("token", token);
-    localStorage.setItem("user",  JSON.stringify(userData));
+    localStorage.setItem("user", JSON.stringify(userData));
     setUser(userData);
   };
 
@@ -80,11 +113,23 @@ function App() {
     setUser(null);
   };
 
-  const handleOnboardingComplete = async () => {
+  const handleOnboardingComplete = async (data) => {
     try {
       await fetch(`${API_URL}/onboarding/complete`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
+       body: JSON.stringify({
+  pais: data?.pais ?? null,
+  actividad: data?.actividad ?? null,
+  monto: data?.monto ?? null,
+  metas: data?.metas ?? [],
+  deudas: data?.deudas ?? null,
+  num_deudas: data?.num_deudas ?? null,
+  finalidad: data?.finalidad ?? null,
+}),
       });
       const res = await fetch(`${API_URL}/me`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -99,6 +144,7 @@ function App() {
     }
   };
 
+  // ── Loader ──────────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -107,46 +153,98 @@ function App() {
     );
   }
 
+  // ── Router ──────────────────────────────────────────────────────────────────
   return (
     <BrowserRouter>
-      {/* Sin sesion */}
+      {/* Sin sesión */}
       {!user ? (
         <PublicRoutes onLogin={handleLogin} />
-
       ) : !user.onboarding_done ? (
-        /* Con sesion pero onboarding pendiente */
+        /* Onboarding pendiente */
         <Routes>
           <Route
             path="*"
             element={
-              <div className="h-screen bg-[#f7f7fb] flex items-start justify-center">
-                <Onboarding onComplete={handleOnboardingComplete} />
-              </div>
+            <div className="min-h-screen bg-[#f7f7fb] flex items-center justify-center p-4">
+  <Onboarding onComplete={handleOnboardingComplete} />
+</div>
             }
           />
         </Routes>
-
       ) : (
-        /* Con sesion y onboarding completo */
+        /* Sesión activa + onboarding completo */
         <Routes>
-          <Route element={<AppLayout user={user} onLogout={handleLogout} onUserUpdate={setUser} />}>
+          <Route
+            element={<AppLayout user={user} onLogout={handleLogout} onUserUpdate={setUser} />}
+          >
+            {/* ── Dashboard ── */}
             <Route
               path="/dashboard"
-              element={user.role === "admin" ? <DashboardAdminPage /> : <DashboardUserPage />}
+              element={
+                user.role === "admin" ? <DashboardAdminPage /> : <DashboardUserPage />
+              }
             />
-            <Route path="/cuentas"     element={<CuentasPage />} />
-            <Route path="/usuarios"    element={user.role === "admin" ? <UsuariosPage />    : <Navigate to="/dashboard" />} />
-            <Route path="/organigrama" element={user.role === "admin" ? <OrganigramaPage /> : <Navigate to="/dashboard" />} />
-            <Route path="/"            element={<Navigate to="/dashboard" />} />
+            <Route path="/" element={<Navigate to="/dashboard" />} />
+
+            {/* ── Módulos comunes (usuario y admin) ── */}
+            <Route path="/cuentas" element={<CuentasPage />} />
             <Route path="/reportes" element={<ReportesPage />} />
-<Route path="/pagos"         element={<PagosPage />} />
-<Route path="/recordatorios" element={<RecordatoriosPage />} />
-<Route path="/tickets"       element={<TicketsUserPage />} /><Route path="/tickets/:id/chat" element={<TicketChatPage />} />
-<Route path="/testimonios" element={<TestimoniosPublicPage />} />
-<Route path="/testimonios/mi-testimonio" element={<TestimoniosUserPage />} />
-<Route path="/admin/testimonios" element={user.role === "admin" ? <TestimoniosAdminPage /> : <Navigate to="/dashboard" />} />
-<Route path="/admin/tickets" element={user.role === "admin" ? <TicketsAdminPage /> : <Navigate to="/dashboard" />} />
+            <Route path="/pagos" element={<PagosPage />} />
+            <Route path="/recordatorios" element={<RecordatoriosPage />} />
+            <Route path="/tickets" element={<TicketsUserPage />} />
+            <Route path="/tickets/:id/chat" element={<TicketChatPage />} />
+            <Route path="/testimonios" element={<TestimoniosPublicPage />} />
+            <Route path="/testimonios/mi-testimonio" element={<TestimoniosUserPage />} />
+            <Route path="/anuncios" element={<AnunciosPage />} />
+            <Route path="/mi-equipo" element={<MiEquipoPage />} />
+            <Route path="/perfil" element={<MiPerfilPage onUserUpdate={setUser} />} />
+
+            {/* ── Agenda ── */}
+            <Route path="/agenda" element={<AgendaPage />} />
+
+            {/* ── Módulos solo administrador ── */}
+            <Route
+              path="/usuarios"
+              element={user.role === "admin" ? <UsuariosPage /> : <Navigate to="/dashboard" />}
+            />
+            <Route
+              path="/organigrama"
+              element={
+                user.role === "admin" ? <OrganigramaPage /> : <Navigate to="/dashboard" />
+              }
+            />
+            <Route
+              path="/admin/tickets"
+              element={
+                user.role === "admin" ? <TicketsAdminPage /> : <Navigate to="/dashboard" />
+              }
+            />
+            <Route
+              path="/admin/testimonios"
+              element={
+                user.role === "admin" ? <TestimoniosAdminPage /> : <Navigate to="/dashboard" />
+              }
+            />
+            <Route
+              path="/admin/anuncios"
+              element={
+                user.role === "admin" ? <AdminAnunciosPage /> : <Navigate to="/dashboard" />
+              }
+            />
+
+            {/* ── En construcción (accesibles para todos) ── */}
+            <Route path="/metas" element={<EnConstruccionPage />} />
+            <Route path="/deudas" element={<EnConstruccionPage />} />
+            <Route path="/configurar-pagos" element={<EnConstruccionPage />} />
+            <Route path="/membresia" element={<EnConstruccionPage />} />
+            <Route path="/comisiones" element={<EnConstruccionPage />} />
+            <Route path="/ganancias" element={<EnConstruccionPage />} />
+            <Route path="/plan-emprendedor" element={<EnConstruccionPage />} />
+            <Route path="/ayuda" element={<EnConstruccionPage />} />
+            <Route path="/terminos" element={<EnConstruccionPage />} />
           </Route>
+
+          {/* Fallback */}
           <Route path="*" element={<Navigate to="/dashboard" />} />
         </Routes>
       )}

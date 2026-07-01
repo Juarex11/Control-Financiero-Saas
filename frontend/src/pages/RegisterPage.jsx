@@ -19,13 +19,30 @@ export default function RegisterPage({ onLogin, onGoLogin }) {
   const [padreNombre, setPadreNombre] = useState("");
   const totalSteps = 4;
 
-  // Reinicia la animación de los textos cada 8 segundos
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setAnimationKey(prev => prev + 1);
-    }, 8000);
-    return () => clearInterval(interval);
-  }, []);
+// Leer ?code=XXXXXXXX de la URL y saltar al paso 2
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  if (!code) return;
+
+  setForm(f => ({ ...f, codigo_padre: code.toUpperCase() }));
+  setLoading(true);
+
+  fetch(`${API_URL}/validar-codigo`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ codigo: code.toUpperCase() }),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.nombre) {
+        setPadreNombre(data.nombre);
+        setStep(2); // ← salta directo al paso 2
+      }
+    })
+    .catch(() => {})
+    .finally(() => setLoading(false));
+}, []);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 

@@ -7,11 +7,46 @@ import {
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL;
+// ─── Mapeo país → moneda (frontend, sin depender de user.currency) ────────
 
+const MONEDAS_POR_PAIS = {
+  Argentina: "ARS",
+  Bolivia: "BOB",
+  Chile: "CLP",
+  Colombia: "COP",
+  "Costa Rica": "CRC",
+  Cuba: "CUP",
+  Ecuador: "USD",
+  "El Salvador": "USD",
+  España: "EUR",
+  Guatemala: "GTQ",
+  Honduras: "HNL",
+  México: "MXN",
+  Nicaragua: "NIO",
+  Panamá: "USD",
+  Paraguay: "PYG",
+  Perú: "PEN",
+  "Puerto Rico": "USD",
+  "República Dominicana": "DOP",
+  Uruguay: "UYU",
+  Venezuela: "VES",
+};
 function getToken() {
   return localStorage.getItem("token");
 }
-
+function getUserCurrency() {
+  try {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    // Si el usuario tiene un país en el mapeo, usa esa moneda
+    if (user.pais && MONEDAS_POR_PAIS[user.pais]) {
+      return MONEDAS_POR_PAIS[user.pais];
+    }
+    // Fallback: usar el campo currency guardado o PEN
+    return user.currency || "PEN";
+  } catch {
+    return "PEN";
+  }
+}
 // ── Íconos disponibles ────────────────────────────────────────────────────────
 
 const ICONS = [
@@ -30,18 +65,24 @@ const ICONS = [
 // ── Monedas ───────────────────────────────────────────────────────────────────
 
 const CURRENCIES = [
-  { code: "PEN", symbol: "S/",  label: "Sol peruano"       },
-  { code: "USD", symbol: "$",   label: "Dólar americano"   },
-  { code: "EUR", symbol: "€",   label: "Euro"              },
-  { code: "GBP", symbol: "£",   label: "Libra esterlina"   },
-  { code: "BRL", symbol: "R$",  label: "Real brasileño"    },
-  { code: "CLP", symbol: "$",   label: "Peso chileno"      },
-  { code: "COP", symbol: "$",   label: "Peso colombiano"   },
-  { code: "MXN", symbol: "$",   label: "Peso mexicano"     },
-  { code: "ARS", symbol: "$",   label: "Peso argentino"    },
-  { code: "BOB", symbol: "Bs",  label: "Boliviano"         },
+  { code: "PEN", symbol: "S/",  label: "Sol peruano"          },
+  { code: "USD", symbol: "$",   label: "Dólar americano"      },
+  { code: "EUR", symbol: "€",   label: "Euro"                 },
+  { code: "ARS", symbol: "$",   label: "Peso argentino"       },
+  { code: "BOB", symbol: "Bs",  label: "Boliviano"            },
+  { code: "CLP", symbol: "$",   label: "Peso chileno"         },
+  { code: "COP", symbol: "$",   label: "Peso colombiano"      },
+  { code: "CRC", symbol: "₡",   label: "Colón costarricense"  },
+  { code: "CUP", symbol: "$",   label: "Peso cubano"          },
+  { code: "GTQ", symbol: "Q",   label: "Quetzal guatemalteco" },
+  { code: "HNL", symbol: "L",   label: "Lempira hondureño"    },
+  { code: "MXN", symbol: "$",   label: "Peso mexicano"        },
+  { code: "NIO", symbol: "C$",  label: "Córdoba nicaragüense" },
+  { code: "PYG", symbol: "₲",   label: "Guaraní paraguayo"    },
+  { code: "DOP", symbol: "RD$", label: "Peso dominicano"      },
+  { code: "UYU", symbol: "$U",  label: "Peso uruguayo"        },
+  { code: "VES", symbol: "Bs.S",label: "Bolívar venezolano"   },
 ];
-
 // ── Colores predefinidos ──────────────────────────────────────────────────────
 
 const COLORS = [
@@ -140,12 +181,12 @@ function AccountCard({ account, onClick, onEdit, onDelete }) {
 
 // ── Panel crear / editar ──────────────────────────────────────────────────────
 
-function AccountPanel({ editing, onClose, onSaved }) {
+function AccountPanel({ editing, defaultCurrency = "PEN", onClose, onSaved }) {
   const [form, setForm] = useState({
     name:     editing?.name     ?? "",
     icon:     editing?.icon     ?? "wallet",
     color:    editing?.color    ?? "#31138b",
-    currency: editing?.currency ?? "PEN",
+    currency: editing?.currency ?? defaultCurrency,
     balance:  editing?.balance  ?? "",
     note:     editing?.note     ?? "",
   });
@@ -170,14 +211,14 @@ function AccountPanel({ editing, onClose, onSaved }) {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({
-          name:     form.name,
-          icon:     form.icon,
-          color:    form.color,
-          currency: form.currency,
-          balance:  form.balance === "" ? 0 : parseFloat(form.balance),
-          note:     form.note || null,
-        }),
+      body: JSON.stringify({
+  name:     form.name,
+  icon:     form.icon,
+  color:    form.color,
+  currency: form.currency,
+  ...(editing ? {} : { balance: form.balance === "" ? 0 : parseFloat(form.balance) }),
+  note:     form.note || null,
+}),
       });
 
       const data = await res.json();
@@ -293,26 +334,33 @@ function AccountPanel({ editing, onClose, onSaved }) {
           </select>
         </div>
 
-        {/* Saldo inicial */}
-        <div>
-          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-            {editing ? "Saldo actual" : "Saldo inicial"}
-          </label>
-          <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">
-              {getCurrencySymbol(form.currency)}
-            </span>
-            <input
-              type="number"
-              value={form.balance}
-              onChange={e => set("balance", e.target.value)}
-              placeholder="0.00"
-              min="0"
-              step="0.01"
-              className="w-full border border-gray-200 rounded-[4px] pl-10 pr-4 py-2.5 text-sm outline-none focus:border-[#ff4d94] transition"
-            />
-          </div>
-        </div>
+      {/* Saldo — editable solo al crear, informativo al editar */}
+<div>
+  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+    {editing ? "Saldo actual" : "Saldo inicial"}
+  </label>
+  {editing ? (
+    <div className="w-full border border-gray-100 bg-gray-50 rounded-[4px] px-4 py-2.5 text-sm text-gray-500 flex items-center justify-between">
+      <span>{getCurrencySymbol(form.currency)} {Number(form.balance).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</span>
+      <span className="text-[10px] text-gray-400">Se actualiza con transacciones</span>
+    </div>
+  ) : (
+    <div className="relative">
+      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">
+        {getCurrencySymbol(form.currency)}
+      </span>
+      <input
+        type="number"
+        value={form.balance}
+        onChange={e => set("balance", e.target.value)}
+        placeholder="0.00"
+        min="0"
+        step="0.01"
+        className="w-full border border-gray-200 rounded-[4px] pl-10 pr-4 py-2.5 text-sm outline-none focus:border-[#ff4d94] transition"
+      />
+    </div>
+  )}
+</div>
 
         {/* Nota */}
         <div>
@@ -570,19 +618,19 @@ export default function CuentasPage() {
   </div>
 
   {/* Saldo total */}
-  <div className="rounded-[4px] border border-gray-100 shadow-sm px-5 py-4 text-white" style={{ background: "linear-gradient(135deg, #ffbf2f 0%, #f59e0b 100%)" }}>
-    <div className="flex items-center gap-3">
-      <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-        <DollarSign size={20} className="text-white" />
-      </div>
-      <div>
-        <p className="text-xs font-semibold text-white/80 uppercase tracking-wide">Saldo total</p>
-        <p className="text-2xl font-extrabold">
-          S/ {totalSaldo.toLocaleString("es-PE", { minimumFractionDigits: 2 })}
-        </p>
-      </div>
+ <div className="rounded-[4px] border border-gray-100 shadow-sm px-5 py-4 text-white" style={{ background: "linear-gradient(135deg, #ffbf2f 0%, #f59e0b 100%)" }}>
+  <div className="flex items-center gap-3">
+    <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+      <DollarSign size={20} className="text-white" />
+    </div>
+    <div>
+      <p className="text-xs font-semibold text-white/80 uppercase tracking-wide">Saldo total</p>
+      <p className="text-2xl font-extrabold">
+        {getCurrencySymbol(getUserCurrency())} {totalSaldo.toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+      </p>
     </div>
   </div>
+</div>
 </div>
 
             {/* Cards cuentas */}
@@ -624,13 +672,14 @@ export default function CuentasPage() {
       </div>
 
       {/* Panel lateral */}
-      {panel && (
-        <AccountPanel
-          editing={editing}
-          onClose={cerrarPanel}
-          onSaved={handleSaved}
-        />
-      )}
+    {panel && (
+  <AccountPanel
+    editing={editing}
+    defaultCurrency={getUserCurrency()}
+    onClose={cerrarPanel}
+    onSaved={handleSaved}
+  />
+)}
     </div>
   );
 }

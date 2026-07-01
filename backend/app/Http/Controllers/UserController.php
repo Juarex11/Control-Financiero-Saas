@@ -217,7 +217,47 @@ class UserController extends Controller
     }
 
     // ── Eliminar ──────────────────────────────────────────────────────────────
+public function miEquipo(Request $request)
+{
+    $yo = $request->user();
 
+    // Carga recursiva hasta 4 niveles
+    $yo->loadMissing([
+        'hijos.hijos.hijos.hijos',
+    ]);
+
+    $mapear = function ($user, $nivel) use (&$mapear) {
+        if ($nivel > 4) return null;
+        return [
+            'id'     => $user->id,
+            'name'   => $user->name,
+            'cargo'  => $user->cargo,
+            'photo'  => $user->photo ? asset('storage/' . $user->photo) : null,
+            'hijos'  => $nivel < 4
+                ? $user->hijos->map(fn($h) => $mapear($h, $nivel + 1))->filter()->values()
+                : [],
+        ];
+    };
+
+    $niveles = [];
+    $cola = collect($yo->hijos);
+    for ($n = 1; $n <= 4; $n++) {
+        $niveles[$n] = $cola->count();
+        $cola = $cola->flatMap(fn($u) => $u->hijos ?? collect());
+    }
+
+    return response()->json([
+        'yo'       => [
+            'id'    => $yo->id,
+            'name'  => $yo->name,
+            'cargo' => $yo->cargo,
+            'photo' => $yo->photo ? asset('storage/' . $yo->photo) : null,
+        ],
+        'arbol'    => $yo->hijos->map(fn($h) => $mapear($h, 1))->values(),
+        'resumen'  => $niveles, // { "1": 3, "2": 7, "3": 2, "4": 0 }
+        'total'    => array_sum($niveles),
+    ]);
+}
     public function destroy(User $user)
     {
         if ($user->role === 'admin') {
@@ -234,9 +274,131 @@ class UserController extends Controller
 
     // ── Completar onboarding ──────────────────────────────────────────────────
 
-    public function completeOnboarding(Request $request)
-    {
-        $request->user()->update(['onboarding_done' => true]);
-        return response()->json(['ok' => true]);
+public function completeOnboarding(Request $request)
+{
+    $data = $request->validate([
+        'pais'       => 'nullable|string|max:60',
+        'timezone'   => 'nullable|string|max:60',
+        'actividad'  => 'nullable|string|max:30',
+        'metas'      => 'nullable|array',
+        'metas.*'    => 'string|max:30',
+        'deudas'     => 'nullable|boolean',
+        'num_deudas' => 'nullable|string|max:5',
+        'finalidad'  => 'nullable|string|max:30',
+    ]);
+
+    $user = $request->user();
+
+    $monedasPorPais = [
+        'Argentina' => 'ARS', 'Bolivia' => 'BOB', 'Chile' => 'CLP', 'Colombia' => 'COP',
+        'Costa Rica' => 'CRC', 'Cuba' => 'CUP', 'Ecuador' => 'USD', 'El Salvador' => 'USD',
+        'España' => 'EUR', 'Guatemala' => 'GTQ', 'Honduras' => 'HNL', 'México' => 'MXN',
+        'Nicaragua' => 'NIO', 'Panamá' => 'USD', 'Paraguay' => 'PYG', 'Perú' => 'PEN',
+        'Puerto Rico' => 'USD', 'República Dominicana' => 'DOP', 'Uruguay' => 'UYU', 'Venezuela' => 'VES',
+    ];
+
+    $currency = $monedasPorPais[$data['pais'] ?? ''] ?? 'PEN';
+
+    $user->update([
+        'onboarding_done' => true,
+        'pais'            => $data['pais']       ?? null,
+        'timezone'        => $data['timezone']   ?? null,
+        'currency'        => $currency,
+        'ob_actividad'    => $data['actividad']  ?? null,
+        'ob_metas'        => isset($data['metas']) ? json_encode($data['metas']) : null,
+        'ob_deudas'       => $data['deudas']     ?? null,
+        'ob_num_deudas'   => $data['num_deudas'] ?? null,
+        'ob_finalidad'    => $data['finalidad']  ?? null,
+    ]);
+
+    $user->accounts()->where('is_primary', true)->update(['currency' => $currency]);
+
+    return response()->json(['message' => 'Onboarding completado.']);
+}
+ public function stats(): \Illuminate\Http\JsonResponse
+{
+    $total    = User::count();
+    $admins   = User::where('role', 'admin')->count();
+    $usuarios = User::where('role', 'user')->count();
+ 
+    $ahora        = now();
+    $nuevosHoy    = User::whereDate('created_at', $ahora->toDateString())->count();
+    $nuevosSemana = User::where('created_at', '>=', $ahora->startOfWeek())->count();
+    $nuevosMes    = User::where('created_at', '>=', $ahora->copy()->startOfMonth())->count();
+ 
+    // Onboarding completado
+    $conOnboarding = User::where('onboarding_done', true)->count();
+ 
+    // Distribución actividad
+    $actividades = User::whereNotNull('ob_actividad')
+        ->selectRaw('ob_actividad as label, count(*) as total')
+        ->groupBy('ob_actividad')
+        ->orderByDesc('total')
+        ->get();
+ 
+    // Distribución finalidad
+    $finalidades = User::whereNotNull('ob_finalidad')
+        ->selectRaw('ob_finalidad as label, count(*) as total')
+        ->groupBy('ob_finalidad')
+        ->orderByDesc('total')
+        ->get();
+ 
+    // Distribución deudas
+    $conDeudas    = User::where('ob_deudas', true)->count();
+    $sinDeudas    = User::where('ob_deudas', false)->count();
+ 
+    // Metas más elegidas (descomponer el JSON)
+    $metasRaw = User::whereNotNull('ob_metas')->pluck('ob_metas');
+    $metasCount = [];
+    foreach ($metasRaw as $json) {
+        $arr = is_array($json) ? $json : json_decode($json, true);
+        if (!is_array($arr)) continue;
+        foreach ($arr as $meta) {
+            $metasCount[$meta] = ($metasCount[$meta] ?? 0) + 1;
+        }
     }
+    arsort($metasCount);
+    $metas = collect($metasCount)->map(fn($v, $k) => ['label' => $k, 'total' => $v])->values();
+ 
+    // País
+    $paises = User::whereNotNull('pais')
+        ->selectRaw('pais as label, count(*) as total')
+        ->groupBy('pais')
+        ->orderByDesc('total')
+        ->limit(10)
+        ->get();
+ 
+    // Últimos 7 días de registros
+    $porDia = User::selectRaw('DATE(created_at) as dia, count(*) as total')
+        ->where('created_at', '>=', now()->subDays(6)->startOfDay())
+        ->groupBy('dia')
+        ->orderBy('dia')
+        ->get();
+ 
+    // Completar días faltantes con 0
+    $diasCompletos = collect();
+    for ($i = 6; $i >= 0; $i--) {
+        $fecha = now()->subDays($i)->format('Y-m-d');
+        $found = $porDia->firstWhere('dia', $fecha);
+        $diasCompletos->push(['dia' => $fecha, 'total' => $found?->total ?? 0]);
+    }
+ 
+    return response()->json([
+        'resumen' => [
+            'total'          => $total,
+            'admins'         => $admins,
+            'usuarios'       => $usuarios,
+            'nuevos_hoy'     => $nuevosHoy,
+            'nuevos_semana'  => $nuevosSemana,
+            'nuevos_mes'     => $nuevosMes,
+            'con_onboarding' => $conOnboarding,
+        ],
+        'actividades'  => $actividades,
+        'finalidades'  => $finalidades,
+        'deudas'       => ['con' => $conDeudas, 'sin' => $sinDeudas],
+        'metas'        => $metas,
+        'paises'       => $paises,
+        'registros'    => $diasCompletos,
+    ]);
+}
 }

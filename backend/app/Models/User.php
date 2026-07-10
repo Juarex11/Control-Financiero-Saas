@@ -119,4 +119,8 @@ public function testimonio()
 {
     return $this->hasOne(Testimonio::class);
 }
+public function recurringPayments()
+{
+    return $this->hasMany(RecurringPayment::class);
+}
 }

@@ -41,9 +41,11 @@ class AuthController extends Controller
                 'photo'           => $user->photo,
                 'photo_url'       => $user->photo ? asset('storage/' . $user->photo) : null,
                 'currency'        => $user->currency,
+                'pais'            => $user->pais,
+                'timezone'        => $user->timezone,
                 'padre_id'        => $user->padre_id,
                 'last_login'      => $user->last_login,
-                'onboarding_done' => $user->onboarding_done, // ← nuevo
+                'onboarding_done' => $user->onboarding_done,
             ],
         ]);
     }
@@ -70,11 +72,13 @@ class AuthController extends Controller
             'codigo_acceso'   => $user->codigo_acceso,
             'cargo'           => $user->cargo,
             'photo'           => $user->photo,
-            'photo_url'       => $user->photo ? asset('storage/' . $user->photo) : null, // ← nuevo
+            'photo_url'       => $user->photo ? asset('storage/' . $user->photo) : null,
             'currency'        => $user->currency,
+            'pais'            => $user->pais,
+            'timezone'        => $user->timezone,
             'padre_id'        => $user->padre_id,
             'last_login'      => $user->last_login,
-            'onboarding_done' => $user->onboarding_done, // ← nuevo
+            'onboarding_done' => $user->onboarding_done,
         ]);
     }
 }

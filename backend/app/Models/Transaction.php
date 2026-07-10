@@ -9,6 +9,7 @@ class Transaction extends Model
     protected $fillable = [
         'user_id', 'account_id', 'category_id',
         'transfer_account_id', 'type', 'amount', 'note', 'date',
+        'recurring_payment_log_id',
     ];
 
     protected $casts = [
@@ -34,5 +35,10 @@ class Transaction extends Model
     public function transferAccount()
     {
         return $this->belongsTo(Account::class, 'transfer_account_id');
+    }
+
+    public function recurringPaymentLog()
+    {
+        return $this->belongsTo(RecurringPaymentLog::class);
     }
 }

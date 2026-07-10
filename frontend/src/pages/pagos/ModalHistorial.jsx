@@ -8,7 +8,9 @@ function getToken() { return localStorage.getItem("token"); }
 const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 
 function formatDate(str) {
-  const d = new Date(str + "T12:00:00");
+  if (!str) return "—";
+  const soloFecha = str.split("T")[0];
+  const d = new Date(soloFecha + "T12:00:00");
   return `${d.getDate()} ${MESES[d.getMonth()]} ${d.getFullYear()}`;
 }
 
@@ -18,9 +20,9 @@ function getCurrencySymbol(code) {
 }
 
 export default function ModalHistorial({ pago, onClose, onActualizado }) {
-  const [logs,     setLogs]     = useState([]);
-  const [loading,  setLoading]  = useState(true);
-  const [actioning,setActioning]= useState(null);
+  const [logs,      setLogs]      = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [actioning, setActioning] = useState(null);
 
   const cargar = async () => {
     setLoading(true);
@@ -29,13 +31,15 @@ export default function ModalHistorial({ pago, onClose, onActualizado }) {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       const data = await res.json();
-      setLogs(Array.isArray(data) ? data : []);
+      const ordenado = (Array.isArray(data) ? data : [])
+        .sort((a, b) => new Date(a.scheduled_date) - new Date(b.scheduled_date)); // ascendente: 01, 02, 03...
+      setLogs(ordenado);
     } finally { setLoading(false); }
   };
 
   useEffect(() => { cargar(); }, []);
 
-  const marcar = async (logId, status) => {
+const marcar = async (logId, status) => {
     setActioning(logId);
     try {
       await fetch(`${API_URL}/recurring-payments/${pago.id}/mark`, {
@@ -45,6 +49,7 @@ export default function ModalHistorial({ pago, onClose, onActualizado }) {
       });
       await cargar();
       onActualizado();
+      window.dispatchEvent(new Event("recurring-payments-updated")); // avisa a Header/Sidebar
     } finally { setActioning(null); }
   };
 
@@ -56,7 +61,9 @@ export default function ModalHistorial({ pago, onClose, onActualizado }) {
     return { background:"#eff6ff", color:"#2563eb", border:"1px solid #93c5fd" };
   };
 
-  const badgeLabel = s => s === "paid" ? "Pagado" : s === "skipped" ? "Saltado" : "Pendiente";
+  const badgeLabel = s => s === "paid" ? "Pagado" : s === "skipped" ? "Saltado" : "Por confirmar";
+
+  const pendientesCount = logs.filter(l => l.status === "pending").length;
 
   return createPortal(
     <div
@@ -68,7 +75,9 @@ export default function ModalHistorial({ pago, onClose, onActualizado }) {
         <div style={{ background:"#31138b", padding:"1rem 1.5rem", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
           <div>
             <p style={{ color:"#fff", fontWeight:700, fontSize:"1rem", margin:0 }}>{pago.name}</p>
-            <p style={{ color:"rgba(255,255,255,0.6)", fontSize:"0.7rem", margin:0 }}>Historial de recordatorios</p>
+            <p style={{ color:"rgba(255,255,255,0.6)", fontSize:"0.7rem", margin:0 }}>
+              Historial de recordatorios {pendientesCount > 0 && `· ${pendientesCount} por confirmar`}
+            </p>
           </div>
           <button onClick={onClose} style={{ background:"transparent", border:"none", color:"#fff", cursor:"pointer", width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center" }}>
             <X size={18} />
@@ -77,7 +86,7 @@ export default function ModalHistorial({ pago, onClose, onActualizado }) {
 
         {/* Info del pago */}
         <div style={{ padding:"0.75rem 1.5rem", background:"#f8fafc", borderBottom:"1px solid #f1f5f9", flexShrink:0 }}>
-          <div style={{ display:"flex", gap:"1.5rem", fontSize:"0.75rem", color:"#6b7280" }}>
+          <div style={{ display:"flex", gap:"1.5rem", fontSize:"0.75rem", color:"#6b7280", flexWrap:"wrap" }}>
             <span><b style={{ color:"#374151" }}>Monto:</b> {sym} {Number(pago.amount).toLocaleString("es-PE",{minimumFractionDigits:2})}</span>
             <span><b style={{ color:"#374151" }}>Cuenta:</b> {pago.account?.name}</span>
             <span><b style={{ color:"#374151" }}>Tipo:</b> {pago.type === "expense" ? "Gasto" : "Ingreso"}</span>
@@ -95,8 +104,13 @@ export default function ModalHistorial({ pago, onClose, onActualizado }) {
               Sin registros aún.
             </div>
           ) : (
-            logs.map(log => (
+            logs.map((log, i) => (
               <div key={log.id} style={{ display:"flex", alignItems:"center", gap:"0.75rem", padding:"0.875rem 1.5rem", borderBottom:"1px solid #f9fafb" }}>
+                {/* Número de orden */}
+                <span style={{ fontSize:"0.65rem", fontWeight:700, color:"#d1d5db", minWidth:18 }}>
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+
                 {/* Ícono estado */}
                 <div style={{ width:36, height:36, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0,
                   background: log.status === "paid" ? "#dcfce7" : log.status === "skipped" ? "#fef9c3" : "#eff6ff" }}>

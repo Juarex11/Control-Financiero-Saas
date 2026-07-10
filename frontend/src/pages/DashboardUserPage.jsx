@@ -120,7 +120,6 @@ function EmptyDonut({ label, color, onClick }) {
   );
 }
 
-// ── Donut con datos ───────────────────────────────────────────────────────────
 function DonutChart({ data, total, label, color, currency, onClick }) {
   if (!data || data.length === 0) return <EmptyDonut label={label} color={color} onClick={onClick} />;
 
@@ -128,7 +127,7 @@ function DonutChart({ data, total, label, color, currency, onClick }) {
     if (!active || !payload?.length) return null;
     const d = payload[0];
     return (
-      <div className="bg-white border border-purple-100 rounded-xl px-4 py-3 shadow-lg text-xs">
+      <div className="bg-white border border-purple-100 rounded-xl px-4 py-3 shadow-lg text-xs" style={{ zIndex: 9999 }}>
         <div className="flex items-center gap-2 mb-1">
           <div className="w-3 h-3 rounded-full" style={{ background: d.payload.color }} />
           <span className="font-bold text-gray-700">{d.payload.name}</span>
@@ -141,7 +140,7 @@ function DonutChart({ data, total, label, color, currency, onClick }) {
 
   return (
     <button onClick={onClick} className="flex flex-col items-center gap-3 w-full group">
-      <div className="relative w-48 h-48 transition-all duration-300 group-hover:scale-105">
+      <div className="relative w-48 h-48 transition-all duration-300 group-hover:scale-105" style={{ overflow: 'visible' }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie data={data} cx="50%" cy="50%" innerRadius={48} outerRadius={68}
@@ -150,7 +149,7 @@ function DonutChart({ data, total, label, color, currency, onClick }) {
                 <Cell key={i} fill={entry.color || PALETTE[i % PALETTE.length]} stroke="white" strokeWidth={2} />
               ))}
             </Pie>
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip />} wrapperStyle={{ zIndex: 9999 }} />
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -168,7 +167,6 @@ function DonutChart({ data, total, label, color, currency, onClick }) {
     </button>
   );
 }
-
 // ── AccountSelector ───────────────────────────────────────────────────────────
 function AccountSelector({ accounts, selected, onChange }) {
   const [open, setOpen] = useState(false);
@@ -262,8 +260,19 @@ export default function DashboardUserPage() {
     } catch {} finally { setLoadingStats(false); }
   }, [selectedAccount, filtro, diaActual, semanaRef, mesActual, anioActual, periodoDesde, periodoHasta]);
 
-  useEffect(() => { cargarCuentas(); cargarCategorias(); }, [cargarCuentas, cargarCategorias]);
+useEffect(() => { cargarCuentas(); cargarCategorias(); }, [cargarCuentas, cargarCategorias]);
   useEffect(() => { cargarStats(); }, [cargarStats]);
+
+  // Refrescar cuentas y estadísticas cuando se confirma un pago habitual
+  // desde cualquier parte de la app (campanita, sidebar, modal, etc.)
+  useEffect(() => {
+    const refrescar = () => {
+      cargarCuentas();
+      cargarStats();
+    };
+    window.addEventListener("recurring-payments-updated", refrescar);
+    return () => window.removeEventListener("recurring-payments-updated", refrescar);
+  }, [cargarCuentas, cargarStats]);
 
   const cuentaActual  = accounts.find(a => a.id === selectedAccount);
   const totalGastos   = useMemo(() => statsGastos.reduce((s, c)   => s + Number(c.value), 0), [statsGastos]);

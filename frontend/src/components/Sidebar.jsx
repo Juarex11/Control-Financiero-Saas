@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { NavLink } from "react-router-dom";
+
+const API_URL = import.meta.env.VITE_API_URL;
+function getToken() { return localStorage.getItem("token"); }
 import {
   LayoutDashboard, Users, Wallet, ChevronLeft, ChevronRight,
   BarChart2, RefreshCw, Tag, MessageSquare, Star, Megaphone,
@@ -14,7 +17,7 @@ const MENU_ADMIN = [
     grupo: null,
     items: [
       { to: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
-       { to: "/perfil",    label: "Mi perfil", Icon: UserCircle       },
+      { to: "/perfil",    label: "Mi perfil", Icon: UserCircle       },
     ],
   },
   {
@@ -24,10 +27,10 @@ const MENU_ADMIN = [
       { to: "/admin/tickets",      label: "Tickets",       Icon: MessageSquare },
       { to: "/admin/testimonios",  label: "Testimonios",   Icon: Star         },
       { to: "/admin/anuncios",     label: "Anuncios",      Icon: Megaphone    },
-       { to: "/agenda", label: "Mi Agenda", Icon: Calendar },
+      { to: "/agenda", label: "Mi Agenda", Icon: Calendar },
     ],
   },
-   {
+  {
     grupo: "Beneficios",
     items: [
       { to: "/membresia",        label: "Administrar membresía",   Icon: Gem        },
@@ -53,9 +56,9 @@ const MENU_USER = [
       { to: "/cuentas",    label: "Cuentas",        Icon: Wallet    },
       { to: "/reportes",   label: "Reportes",       Icon: BarChart2 },
       { to: "/pagos",      label: "Movimientos habit.",  Icon: RefreshCw },
+      { to: "/recordatorios", label: "Categorías de Movi.",   Icon: Tag       },
       { to: "/metas",      label: "Metas",          Icon: Target    },
       { to: "/deudas",     label: "Deudas",         Icon: CreditCard },
-      { to: "/recordatorios", label: "Recordat.",   Icon: Tag       },
     ],
   },
   {
@@ -85,15 +88,53 @@ const MENU_USER = [
   },
 ];
 
+// ── Badge de pendientes/vencidos ────────────────────────────────────────────
+function PagosBadge({ hoy, vencidos, collapsed }) {
+  if (hoy === 0 && vencidos === 0) return null;
+
+  if (collapsed) {
+    // En modo colapsado: un solo puntito, rojo si hay vencidos, si no amarillo
+    return (
+      <span
+        className="absolute top-1 right-1 w-2 h-2 rounded-full"
+        style={{ background: vencidos > 0 ? "#ef4444" : "#f59e0b" }}
+      />
+    );
+  }
+
+  return (
+    <span className="flex items-center gap-1 ml-auto shrink-0">
+      {vencidos > 0 && (
+        <span
+          className="text-[10px] font-bold text-white rounded-full px-1.5 py-0.5 min-w-[18px] text-center leading-none"
+          style={{ background: "#ef4444" }}
+          title="Vencidos"
+        >
+          {vencidos}
+        </span>
+      )}
+      {hoy > 0 && (
+        <span
+          className="text-[10px] font-bold text-white rounded-full px-1.5 py-0.5 min-w-[18px] text-center leading-none"
+          style={{ background: "#f59e0b" }}
+          title="Vence hoy"
+        >
+          {hoy}
+        </span>
+      )}
+    </span>
+  );
+}
+
 // ── Item de navegación ────────────────────────────────────────────────────────
-function NavItem({ to, label, Icon, collapsed, onClose }) {
+function NavItem({ to, label, Icon, collapsed, onClose, badge }) {
   return (
     <NavLink
       to={to}
       onClick={() => { if (window.innerWidth < 1024) onClose(); }}
       title={collapsed ? label : undefined}
       className={({ isActive }) =>
-        `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-150
+        `relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-150
         ${collapsed ? "justify-center px-2" : ""}
         ${isActive
           ? "bg-[#31138b] text-white shadow-[0_2px_8px_rgba(49,19,139,0.25)]"
@@ -103,6 +144,7 @@ function NavItem({ to, label, Icon, collapsed, onClose }) {
     >
       <Icon size={17} className="shrink-0" />
       {!collapsed && <span className="whitespace-nowrap truncate">{label}</span>}
+      {badge}
     </NavLink>
   );
 }
@@ -125,7 +167,71 @@ function GrupoLabel({ label, collapsed }) {
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 export default function Sidebar({ open, onClose, user }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [pendHoy,      setPendHoy]      = useState(0);
+  const [pendVencidos, setPendVencidos] = useState(0);
   const MENU = user?.role === "admin" ? MENU_ADMIN : MENU_USER;
+
+const getUserTimezone = () => user?.timezone || "America/Lima";
+
+  const hoyEnTz = (tz) => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+    }).formatToParts(new Date());
+    const map = {};
+    parts.forEach(p => { map[p.type] = p.value; });
+    return `${map.year}-${map.month}-${map.day}`;
+  };
+
+  const horaActualEnTz = (tz) => new Intl.DateTimeFormat("en-GB", {
+    timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false,
+  }).format(new Date());
+
+  const cargarPendientes = useCallback(async () => {
+    if (user?.role === "admin") return; // solo aplica a usuarios normales
+    try {
+      const res  = await fetch(`${API_URL}/recurring-payments`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      const data = await res.json();
+      if (!Array.isArray(data)) return;
+
+      const tz     = getUserTimezone();
+      const hoyStr = hoyEnTz(tz);
+      const horaActual = horaActualEnTz(tz);
+      const hoy0   = new Date(hoyStr + "T12:00:00");
+
+      let hoy = 0, vencidos = 0;
+
+    data.forEach(p => {
+        if (p.status !== "active" || !p.next_reminder_date) return;
+        if ((p.pending_count ?? 0) === 0) return; // sin nada pendiente, no cuenta
+
+        const soloFecha = p.next_reminder_date.split("T")[0];
+        const fechaObj   = new Date(soloFecha + "T12:00:00");
+        const dias       = Math.round((fechaObj - hoy0) / 86400000);
+
+        if (dias < 0) {
+          vencidos++;
+        } else if (dias === 0) {
+          const horaPaso = p.reminder_time && p.reminder_time.slice(0,5) <= horaActual;
+          if (horaPaso) vencidos++;
+          else hoy++;
+        }
+      });
+
+      setPendHoy(hoy);
+      setPendVencidos(vencidos);
+    } catch {}
+  }, [user?.role, user?.timezone]);
+useEffect(() => {
+    cargarPendientes();
+    const interval = setInterval(cargarPendientes, 5 * 60 * 1000); // cada 5 min
+    window.addEventListener("recurring-payments-updated", cargarPendientes);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("recurring-payments-updated", cargarPendientes);
+    };
+  }, [cargarPendientes]);
 
   return (
     <>
@@ -208,14 +314,17 @@ export default function Sidebar({ open, onClose, user }) {
                     Icon={Icon}
                     collapsed={collapsed}
                     onClose={onClose}
+                    badge={
+                      to === "/pagos"
+                        ? <PagosBadge hoy={pendHoy} vencidos={pendVencidos} collapsed={collapsed} />
+                        : null
+                    }
                   />
                 ))}
               </div>
             ))}
           </div>
         </nav>
-
-  
 
         {/* ── Botón colapsar (solo desktop) ── */}
         <div className="shrink-0 hidden lg:block border-t border-gray-100 p-2">

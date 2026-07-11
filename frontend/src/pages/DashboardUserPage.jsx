@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import {
   Wallet, ChevronDown, ChevronLeft, ChevronRight,
   Check, TrendingUp, TrendingDown, Tag, Plus,
+  Target, CreditCard, ArrowRight,
 } from "lucide-react";
 import ModalTransaccion from "./transaccion/ModalTransaccion";
 import ModalCategorias  from "./transaccion/ModalCategorias";
@@ -167,6 +169,7 @@ function DonutChart({ data, total, label, color, currency, onClick }) {
     </button>
   );
 }
+
 // ── AccountSelector ───────────────────────────────────────────────────────────
 function AccountSelector({ accounts, selected, onChange }) {
   const [open, setOpen] = useState(false);
@@ -198,8 +201,171 @@ function AccountSelector({ accounts, selected, onChange }) {
   );
 }
 
+// ── Salud financiera ──────────────────────────────────────────────────────────
+function SaludFinanciera({ ingresos, gastos, currency }) {
+  const balance = ingresos - gastos;
+  const ratio   = ingresos > 0 ? (gastos / ingresos) * 100 : 0;
+  const ahorro  = ingresos > 0 ? ((ingresos - gastos) / ingresos) * 100 : 0;
+
+  let nivel = "Excelente"; let color = "#10b981"; let pct = 100;
+  if (ratio > 90)      { nivel = "Crítico";    color = "#ef4444"; pct = 10; }
+  else if (ratio > 75) { nivel = "Ajustado";   color = "#f97316"; pct = 35; }
+  else if (ratio > 55) { nivel = "Moderado";   color = "#ffbf2f"; pct = 60; }
+  else if (ratio > 35) { nivel = "Bueno";      color = "#3b82f6"; pct = 80; }
+
+  return (
+    <div className="bg-white rounded-2xl border-2 border-purple-100 shadow-lg p-6">
+      <h3 className="font-bold text-purple-700 text-lg mb-4">Salud financiera</h3>
+      <div className="flex items-center gap-6 mb-4">
+        {/* Gauge */}
+        <div className="relative w-28 h-28 shrink-0">
+          <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+            <circle cx="50" cy="50" r="38" fill="none" stroke="#f3f4f6" strokeWidth="10" />
+            <circle cx="50" cy="50" r="38" fill="none" stroke={color} strokeWidth="10"
+              strokeDasharray={`${(pct / 100) * 239} 239`} strokeLinecap="round"
+              style={{ transition: "stroke-dasharray .8s ease" }} />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-xl font-extrabold" style={{ color }}>{pct}%</span>
+          </div>
+        </div>
+        <div className="flex-1 space-y-3">
+          <div>
+            <div className="flex justify-between text-xs mb-1">
+              <span className="text-gray-500 font-medium">Nivel</span>
+              <span className="font-bold" style={{ color }}>{nivel}</span>
+            </div>
+          </div>
+          <div>
+            <div className="flex justify-between text-xs mb-1">
+              <span className="text-gray-500 font-medium">Ratio gasto/ingreso</span>
+              <span className="font-bold text-gray-700">{ratio.toFixed(1)}%</span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(ratio, 100)}%`, background: color }} />
+            </div>
+          </div>
+          <div>
+            <div className="flex justify-between text-xs mb-1">
+              <span className="text-gray-500 font-medium">Tasa de ahorro</span>
+              <span className="font-bold text-gray-700">{ahorro.toFixed(1)}%</span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(0, ahorro)}%`, background: "#10b981" }} />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3 pt-4 border-t border-purple-50">
+        <div className="text-center">
+          <p className="text-xs text-gray-400">Balance período</p>
+          <p className="text-base font-extrabold" style={{ color: balance >= 0 ? "#10b981" : "#ef4444" }}>
+            {formatMoney(balance, currency)}
+          </p>
+        </div>
+        <div className="text-center">
+          <p className="text-xs text-gray-400">¿Qué recomienda?</p>
+          <p className="text-xs font-semibold text-gray-600 leading-tight mt-0.5">
+            {ratio > 90  ? "Reduce gastos urgente" :
+             ratio > 75  ? "Revisa gastos no esenciales" :
+             ratio > 55  ? "Puedes mejorar el ahorro" :
+             ratio > 35  ? "Vas bien, mantén el ritmo" :
+                           "Excelente disciplina 🎉"}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Resumen de Metas y Deudas ──────────────────────────────────────────────────
+function ResumenMetasDeudas({ goals, debts, currency, navigate }) {
+  const ultimasMetas  = [...goals].sort((a, b) => b.id - a.id).slice(0, 3);
+  const ultimasDeudas = [...debts].sort((a, b) => b.id - a.id).slice(0, 3);
+
+  const MiniBarra = ({ progress, color }) => (
+    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1.5">
+      <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, progress)}%`, background: color }} />
+    </div>
+  );
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Metas */}
+      <div className="bg-white rounded-2xl border-2 border-purple-100 shadow-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-purple-700 text-lg flex items-center gap-2">
+            <Target size={18} /> Metas
+          </h3>
+          <button onClick={() => navigate("/metas")}
+            className="flex items-center gap-1 text-xs font-bold text-purple-500 hover:text-purple-700 transition">
+            Ver todas <ArrowRight size={12} />
+          </button>
+        </div>
+
+        {ultimasMetas.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-6">Aún no tienes metas creadas.</p>
+        ) : (
+          <div className="space-y-4">
+            {ultimasMetas.map(g => {
+              const progress = Math.min(100, (g.current_amount / g.target_amount) * 100);
+              return (
+                <div key={g.id}>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-semibold text-gray-700 truncate">{g.name}</span>
+                    <span className="text-gray-400 font-bold shrink-0 ml-2">
+                      {formatMoney(g.current_amount, currency)} / {formatMoney(g.target_amount, currency)}
+                    </span>
+                  </div>
+                  <MiniBarra progress={progress} color={g.color || "#31138b"} />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Deudas */}
+      <div className="bg-white rounded-2xl border-2 border-purple-100 shadow-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-purple-700 text-lg flex items-center gap-2">
+            <CreditCard size={18} /> Deudas
+          </h3>
+          <button onClick={() => navigate("/deudas")}
+            className="flex items-center gap-1 text-xs font-bold text-purple-500 hover:text-purple-700 transition">
+            Ver todas <ArrowRight size={12} />
+          </button>
+        </div>
+
+        {ultimasDeudas.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-6">Aún no tienes deudas registradas.</p>
+        ) : (
+          <div className="space-y-4">
+            {ultimasDeudas.map(d => {
+              const progress  = Math.min(100, (d.paid_amount / d.total_amount) * 100);
+              const restante  = d.total_amount - d.paid_amount;
+              return (
+                <div key={d.id}>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-semibold text-gray-700 truncate">{d.name}</span>
+                    <span className="text-gray-400 font-bold shrink-0 ml-2">
+                      Falta {formatMoney(restante, currency)}
+                    </span>
+                  </div>
+                  <MiniBarra progress={progress} color={d.color || "#31138b"} />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function DashboardUserPage() {
+  const navigate = useNavigate();
   const user   = JSON.parse(localStorage.getItem("user") || "{}");
   const hora   = new Date().getHours();
   const saludo = hora < 12 ? "Buenos días" : hora < 19 ? "Buenas tardes" : "Buenas noches";
@@ -220,6 +386,10 @@ export default function DashboardUserPage() {
   const [loadingStats,    setLoadingStats]     = useState(false);
   const [showCategorias,  setShowCategorias]   = useState(false);
   const [modalTipo,       setModalTipo]        = useState(null);
+
+  // Nuevos estados para metas y deudas
+  const [goals, setGoals] = useState([]);
+  const [debts, setDebts] = useState([]);
 
   const cargarCuentas = useCallback(async () => {
     try {
@@ -260,19 +430,44 @@ export default function DashboardUserPage() {
     } catch {} finally { setLoadingStats(false); }
   }, [selectedAccount, filtro, diaActual, semanaRef, mesActual, anioActual, periodoDesde, periodoHasta]);
 
-useEffect(() => { cargarCuentas(); cargarCategorias(); }, [cargarCuentas, cargarCategorias]);
-  useEffect(() => { cargarStats(); }, [cargarStats]);
+  const cargarGoalsDebts = useCallback(async () => {
+    try {
+      const [rG, rD] = await Promise.all([
+        fetch(`${API_URL}/goals`, { headers: { Authorization: `Bearer ${getToken()}` } }),
+        fetch(`${API_URL}/debts`, { headers: { Authorization: `Bearer ${getToken()}` } }),
+      ]);
+      const [dG, dD] = await Promise.all([rG.json(), rD.json()]);
+      setGoals(Array.isArray(dG) ? dG : []);
+      setDebts(Array.isArray(dD) ? dD : []);
+    } catch {}
+  }, []);
 
-  // Refrescar cuentas y estadísticas cuando se confirma un pago habitual
-  // desde cualquier parte de la app (campanita, sidebar, modal, etc.)
+  // Carga inicial
+  useEffect(() => {
+    cargarCuentas();
+    cargarCategorias();
+    cargarGoalsDebts();
+  }, [cargarCuentas, cargarCategorias, cargarGoalsDebts]);
+
+  // Cargar estadísticas cuando cambia la cuenta o filtros
+  useEffect(() => {
+    cargarStats();
+  }, [cargarStats]);
+
+  // Refrescar cuando se disparen eventos de pagos habituales y metas/deudas
   useEffect(() => {
     const refrescar = () => {
       cargarCuentas();
       cargarStats();
+      cargarGoalsDebts();
     };
     window.addEventListener("recurring-payments-updated", refrescar);
-    return () => window.removeEventListener("recurring-payments-updated", refrescar);
-  }, [cargarCuentas, cargarStats]);
+    window.addEventListener("goals-debts-updated", refrescar);
+    return () => {
+      window.removeEventListener("recurring-payments-updated", refrescar);
+      window.removeEventListener("goals-debts-updated", refrescar);
+    };
+  }, [cargarCuentas, cargarStats, cargarGoalsDebts]);
 
   const cuentaActual  = accounts.find(a => a.id === selectedAccount);
   const totalGastos   = useMemo(() => statsGastos.reduce((s, c)   => s + Number(c.value), 0), [statsGastos]);
@@ -288,15 +483,15 @@ useEffect(() => { cargarCuentas(); cargarCategorias(); }, [cargarCuentas, cargar
   return (
     <div className="p-6 space-y-6 min-h-screen" style={{ background: "linear-gradient(135deg, #ffffff 0%, #faf5ff 100%)" }}>
 
- {/* Bienvenida */}
-<div className="space-y-0.5">
-  <p className="text-sm font-medium" style={{ color: "#31138b" }}>
-    {saludo}
-  </p>
-  <h1 className="text-3xl font-semibold text-gray-800 tracking-tight">
-    {user.name?.split(" ")[0]}, <span className="font-normal text-gray-600">a tu control financiero</span>
-  </h1>
-</div>
+      {/* Bienvenida */}
+      <div className="space-y-0.5">
+        <p className="text-sm font-medium" style={{ color: "#31138b" }}>
+          {saludo}
+        </p>
+        <h1 className="text-3xl font-semibold text-gray-800 tracking-tight">
+          {user.name?.split(" ")[0]}, <span className="font-normal text-gray-600">a tu control financiero</span>
+        </h1>
+      </div>
 
       {/* Separador tricolor */}
       <div className="flex rounded-xl overflow-hidden h-1.5 shadow-sm">
@@ -453,6 +648,21 @@ useEffect(() => { cargarCuentas(); cargarCategorias(); }, [cargarCuentas, cargar
           </div>
         </div>
       </div>
+
+      {/* ⭐ Resumen Metas y Deudas (NUEVO) */}
+      <ResumenMetasDeudas
+        goals={goals}
+        debts={debts}
+        currency={cuentaActual?.currency ?? "PEN"}
+        navigate={navigate}
+      />
+
+      {/* ⭐ Salud financiera */}
+      <SaludFinanciera
+        ingresos={totalIngresos}
+        gastos={totalGastos}
+        currency={cuentaActual?.currency ?? "PEN"}
+      />
 
       {/* Modales — montados en document.body via createPortal (dentro de cada componente) */}
       {showCategorias && (

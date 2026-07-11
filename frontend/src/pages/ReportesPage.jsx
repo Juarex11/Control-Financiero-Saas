@@ -258,10 +258,29 @@ function Comparativa({ compare, currency }) {
   );
 }
 
-// ── Historial ─────────────────────────────────────────────────────────────────
+// ── Badge de procedencia ──────────────────────────────────────────────────────
+function OrigenBadge({ t }) {
+  if (t.goal_id) {
+    return <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 shrink-0">Meta</span>;
+  }
+  if (t.debt_id) {
+    return <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 shrink-0">Deuda</span>;
+  }
+  if (t.type === "transfer") {
+    return <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 shrink-0">Transferencia</span>;
+  }
+  if (t.category_id) {
+    return <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 shrink-0">Categoría</span>;
+  }
+  return <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 shrink-0">Sin origen</span>;
+}
+
+// ── Historial (nuevo con procedencia y ocultar editar) ──────────────────────
 function HistorialItem({ t, currency, onEdit, onDelete, deleting }) {
-  const isIncome   = t.type === "income";
-  const isTransfer = t.type === "transfer";
+  const isIncome    = t.type === "income";
+  const isTransfer  = t.type === "transfer";
+  const puedeEditar = !t.goal_id && !t.debt_id; // no editable si viene de Meta/Deuda
+
   return (
     <div className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 transition group">
       <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
@@ -274,17 +293,28 @@ function HistorialItem({ t, currency, onEdit, onDelete, deleting }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold text-gray-700 truncate">
-          {t.category?.name ?? (isTransfer ? "Transferencia" : "Sin categoría")}
+          {t.category?.name ?? t.goal?.name ?? t.debt?.name ?? (isTransfer ? "Transferencia" : "Sin categoría")}
         </p>
-        {t.note && <p className="text-[10px] text-gray-400 truncate">{t.note}</p>}
+        <div className="flex items-center gap-1.5">
+          {t.hora && <span className="text-[10px] text-gray-400 shrink-0">{t.hora}</span>}
+          {t.note && <span className="text-[10px] text-gray-400 truncate">· {t.note}</span>}
+        </div>
       </div>
+
+      {/* Columna: procedencia */}
+      <div className="shrink-0">
+        <OrigenBadge t={t} />
+      </div>
+
       <span className={`text-sm font-extrabold shrink-0 ${isIncome ? "text-green-600" : isTransfer ? "text-blue-600" : "text-red-500"}`}>
         {isIncome ? "+" : isTransfer ? "↔" : "-"}{formatMoney(t.amount, currency)}
       </span>
       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
-        <button onClick={() => onEdit(t)} className="w-6 h-6 flex items-center justify-center hover:bg-gray-200 rounded text-gray-400 hover:text-[#31138b] transition">
-          <Pencil size={12} />
-        </button>
+        {puedeEditar && (
+          <button onClick={() => onEdit(t)} className="w-6 h-6 flex items-center justify-center hover:bg-gray-200 rounded text-gray-400 hover:text-[#31138b] transition">
+            <Pencil size={12} />
+          </button>
+        )}
         <button onClick={() => onDelete(t.id)} disabled={deleting === t.id}
           className="w-6 h-6 flex items-center justify-center hover:bg-red-50 rounded text-gray-400 hover:text-red-500 transition">
           {deleting === t.id

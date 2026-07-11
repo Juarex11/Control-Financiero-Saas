@@ -72,27 +72,39 @@ class TransactionController extends Controller
     }
 
     // ── Eliminar transacción (revierte el balance) ────────────────────────────
-    public function destroy(Request $request, Transaction $transaction)
-    {
-        abort_if($transaction->user_id !== $request->user()->id, 403);
+public function destroy(Request $request, Transaction $transaction)
+{
+    abort_if($transaction->user_id !== $request->user()->id, 403);
 
-        DB::transaction(function () use ($transaction) {
-            $account = $transaction->account;
+    DB::transaction(function () use ($transaction) {
+        $account = $transaction->account;
 
-            if ($transaction->type === 'income') {
-                $account->decrement('balance', $transaction->amount);
-            } elseif ($transaction->type === 'expense') {
-                $account->increment('balance', $transaction->amount);
-            } elseif ($transaction->type === 'transfer') {
-                $account->increment('balance', $transaction->amount);
-                $transaction->transferAccount?->decrement('balance', $transaction->amount);
-            }
+        if ($transaction->type === 'income') {
+            $account->decrement('balance', $transaction->amount);
+        } elseif ($transaction->type === 'expense') {
+            $account->increment('balance', $transaction->amount);
+        } elseif ($transaction->type === 'transfer') {
+            $account->increment('balance', $transaction->amount);
+            $transaction->transferAccount?->decrement('balance', $transaction->amount);
+        }
 
-            $transaction->delete();
-        });
+        // Revertir progreso si venía de una Meta
+        if ($transaction->goal_id) {
+            $transaction->goal?->decrement('current_amount', $transaction->amount);
+            $transaction->goal?->update(['status' => 'activa']);
+        }
 
-        return response()->json(['message' => 'Transacción eliminada.']);
-    }
+        // Revertir progreso si venía de una Deuda
+        if ($transaction->debt_id) {
+            $transaction->debt?->decrement('paid_amount', $transaction->amount);
+            $transaction->debt?->update(['status' => 'activa']);
+        }
+
+        $transaction->delete();
+    });
+
+    return response()->json(['message' => 'Transacción eliminada.']);
+}
 
     // ── Stats para el dashboard (donuts) ──────────────────────────────────────
     public function stats(Request $request)
@@ -113,8 +125,8 @@ class TransactionController extends Controller
 
         [$desde, $hasta] = $this->resolverRango($request);
 
-        $rows = Transaction::with('category')
-            ->where('account_id', $account->id)
+      $rows = Transaction::with(['category', 'goal', 'debt'])
+    ->where('account_id', $account->id)
             ->whereIn('type', ['income', 'expense'])
             ->whereBetween('date', [$desde, $hasta])
             ->get();
@@ -157,22 +169,53 @@ class TransactionController extends Controller
         };
     }
 
-    private function agruparPorCategoria($transactions): array
-    {
-        return $transactions
-            ->groupBy('category_id')
-            ->map(function ($group) {
-                $cat = $group->first()->category;
+  private function agruparPorCategoria($transactions): array
+{
+    return $transactions
+        ->groupBy(function ($t) {
+            if ($t->category_id) return 'cat_'  . $t->category_id;
+            if ($t->goal_id)     return 'goal_' . $t->goal_id;
+            if ($t->debt_id)     return 'debt_' . $t->debt_id;
+            return 'sin_categoria';
+        })
+        ->map(function ($group) {
+            $t = $group->first();
+
+            if ($t->category) {
                 return [
-                    'name'  => $cat?->name  ?? 'Sin categoría',
+                    'name'  => $t->category->name,
                     'value' => $group->sum('amount'),
-                    'color' => $cat?->color ?? '#64748b',
-                    'icon'  => $cat?->icon  ?? 'tag',
+                    'color' => $t->category->color ?? '#64748b',
+                    'icon'  => $t->category->icon  ?? 'tag',
                 ];
-            })
-            ->values()
-            ->toArray();
-    }
+            }
+            if ($t->goal) {
+                return [
+                    'name'  => $t->goal->name,
+                    'value' => $group->sum('amount'),
+                    'color' => $t->goal->color ?? '#31138b',
+                    'icon'  => 'target',
+                ];
+            }
+            if ($t->debt) {
+                return [
+                    'name'  => $t->debt->name,
+                    'value' => $group->sum('amount'),
+                    'color' => $t->debt->color ?? '#31138b',
+                    'icon'  => 'credit-card',
+                ];
+            }
+            return [
+                'name'  => 'Sin categoría',
+                'value' => $group->sum('amount'),
+                'color' => '#64748b',
+                'icon'  => 'tag',
+            ];
+        })
+        ->values()
+        ->toArray();
+}
+// Historial paginado con filtros de fecha
 // Historial paginado con filtros de fecha
 public function history(Request $request)
 {
@@ -192,15 +235,31 @@ public function history(Request $request)
 
     [$desde, $hasta] = $this->resolverRango($request);
 
-    $transactions = Transaction::with('category')
-        ->where('account_id', $account->id)
+    $timezone = $request->user()->timezone ?? 'America/Costa_Rica';
+
+   $transactions = Transaction::with(['category', 'goal', 'debt'])
+    ->where('account_id', $account->id)
         ->whereBetween('date', [$desde, $hasta])
         ->orderByDesc('date')
         ->orderByDesc('id')
         ->get()
+        ->each(function ($t) use ($timezone) {
+            $t->hora = $this->formatHora($t->created_at, $timezone);
+        })
         ->groupBy(fn($t) => $t->date->format('Y-m-d'));
 
     return response()->json($transactions);
+}
+
+// Formatea un timestamp UTC a la hora local del usuario, estilo "3:45 p. m."
+private function formatHora($createdAt, string $timezone): string
+{
+    $local  = $createdAt->copy()->timezone($timezone);
+    $hora   = $local->format('g');
+    $minuto = $local->format('i');
+    $ampm   = $local->format('A') === 'AM' ? 'a. m.' : 'p. m.';
+
+    return "{$hora}:{$minuto} {$ampm}";
 }
 
 // Comparativa mes actual vs mes anterior

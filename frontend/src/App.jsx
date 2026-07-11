@@ -30,7 +30,8 @@ import OrganigramaPage from "./pages/admin/OrganigramaPage";
 import TicketsAdminPage from "./pages/tickets/TicketsAdminPage";
 import TestimoniosAdminPage from "./pages/testimonios/TestimoniosAdminPage";
 import AdminAnunciosPage from "./pages/admin/AdminAnunciosPage";
-
+import MetasPage from "./pages/metas/MetasPage";
+import DeudasPage from "./pages/deudas/DeudasPage";
 // Onboarding
 import Onboarding from "./pages/Onboarding";
 
@@ -233,8 +234,8 @@ function App() {
             />
 
             {/* ── En construcción (accesibles para todos) ── */}
-            <Route path="/metas" element={<EnConstruccionPage />} />
-            <Route path="/deudas" element={<EnConstruccionPage />} />
+            <Route path="/metas" element={<MetasPage />} />
+            <Route path="/deudas" element={<DeudasPage />} />
             <Route path="/configurar-pagos" element={<EnConstruccionPage />} />
             <Route path="/membresia" element={<EnConstruccionPage />} />
             <Route path="/comisiones" element={<EnConstruccionPage />} />

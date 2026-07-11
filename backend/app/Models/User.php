@@ -1,6 +1,8 @@
 <?php
 
 namespace App\Models;
+use App\Models\Planes\Subscription;
+use App\Models\Planes\Plan;
 use Illuminate\Database\Eloquent\Factories\HasFactory;  // ← añadir
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -122,5 +124,33 @@ public function testimonio()
 public function recurringPayments()
 {
     return $this->hasMany(RecurringPayment::class);
+}
+public function goals()
+{
+    return $this->hasMany(Goal::class);
+}
+
+public function debts()
+{
+    return $this->hasMany(Debt::class);
+}
+public function subscriptions()
+{
+    return $this->hasMany(Subscription::class);
+}
+
+public function activeSubscription()
+{
+    return $this->hasOne(Subscription::class)
+        ->whereIn('status', ['trial', 'active'])
+        ->where('ends_at', '>=', now()->toDateString())
+        ->latest('ends_at');
+}
+
+public function hasModuleAccess(string $moduleKey): bool
+{
+    $sub = $this->activeSubscription()->with('plan.modules')->first();
+    if (!$sub) return false;
+    return $sub->plan->hasModule($moduleKey);
 }
 }

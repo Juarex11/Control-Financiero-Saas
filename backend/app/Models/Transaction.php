@@ -6,11 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class Transaction extends Model
 {
-    protected $fillable = [
-        'user_id', 'account_id', 'category_id',
-        'transfer_account_id', 'type', 'amount', 'note', 'date',
-        'recurring_payment_log_id',
-    ];
+   protected $fillable = [
+    'user_id', 'account_id', 'category_id',
+    'transfer_account_id', 'type', 'amount', 'note', 'date',
+    'recurring_payment_log_id',
+    'goal_id', 'debt_id',   // ← ¿están estas dos?
+];
 
     protected $casts = [
         'amount' => 'float',
@@ -41,4 +42,14 @@ class Transaction extends Model
     {
         return $this->belongsTo(RecurringPaymentLog::class);
     }
+
+    public function goal()
+{
+    return $this->belongsTo(Goal::class);
+}
+
+public function debt()
+{
+    return $this->belongsTo(Debt::class);
+}
 }
